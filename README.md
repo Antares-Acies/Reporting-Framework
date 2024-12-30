@@ -51,38 +51,3 @@ The code uses logging.warning (or similar) to record detailed step-by-step proce
 Condition checks
 Amount calculations
 Bucket reassignments
-Usage
-Clone the Repository
-
-bash
-Copy code
-git clone https://github.com/your-username/your-repo.git
-Install Dependencies
-
-This code assumes you have pandas, numpy, and logging available.
-If needed, install them:
-bash
-Copy code
-pip install pandas numpy
-Run the Script
-
-Import and integrate the functions into your own script, or call them directly if you have an entry-point file. For example:
-python
-Copy code
-from your_module import apply_rule_based_bucketing
-
-# Suppose you have a DataFrame `df`...
-bucketed_values = apply_rule_based_bucketing(
-    df,
-    bucketing_rule_set="BKT_rule_001",
-    value_source_column="measure_value",
-    adjustment_rule="Adj_Bucket001"
-)
-Check Logs
-
-Examine your console or log file for detailed messages about the bucketing and adjustments.
-Configuration
-reporting_bucketing_adjustment DataFrame includes columns like bucketing_rule_id, from_bucket_id, to_bucket_id, and impact_value.
-mapping_set for “Contains” / “Does not Contain” is essential for condition-based filtering.
-rule_based_bucketing must define how rules map to buckets.
-Notes
