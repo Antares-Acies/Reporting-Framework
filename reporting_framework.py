@@ -265,7 +265,7 @@ def evaluate_condition(df, condition):
     df_column = df[condition_column_name]
     ####### Convert the column to the specified datatype
     try:
-        if condition_datatype == 'int':
+        if condition_datatype == 'Integer':
             df_column = df[condition_column_name].astype(int)
         elif condition_datatype == 'Numeric' or condition_datatype == 'Float':
             df_column = df[condition_column_name].astype(float)
