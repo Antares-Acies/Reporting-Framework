@@ -556,8 +556,8 @@ for idx, scenario in grouped_scenarios.iterrows():
     label_id_df_transposed.columns = ['Key', 'Value']
     
     # Save the transposed DataFrames to CSV without the index column
-    rule_group_df_transposed.to_csv('rule_group_to_bucketing_applicability_pd.csv', index=False)
-    label_id_df_transposed.to_csv('label_id_to_bucketing_applicability_pd.csv', index=False)
+    # rule_group_df_transposed.to_csv('rule_group_to_bucketing_applicability_pd.csv', index=False)
+    # label_id_df_transposed.to_csv('label_id_to_bucketing_applicability_pd.csv', index=False)
 
     # Define functions that use scenario-specific variables
     def evaluate_rule_set(rule_set, rule_group):
@@ -838,6 +838,8 @@ for idx, scenario in grouped_scenarios.iterrows():
         
             # Apply conditions for each bucket
             for idx, condition in bucket_conditions.iterrows():
+                logging.warning(f"  ")
+                logging.warning(f"  ")
                 if 'tenor' in condition and 'tenor_unit' in condition:
                     if pd.notnull(condition['tenor']) and pd.notnull(condition['tenor_unit']):
                         tenor_unit = condition['tenor_unit'].lower()  # Normalize to lowercase
@@ -1461,7 +1463,7 @@ for idx, scenario in grouped_scenarios.iterrows():
     
     
     bucketed_values_dict_pd =  pd.DataFrame(bucketed_values_dict)
-    bucketed_values_dict_pd.to_csv('bucketed_values_dict_pd.csv', index=False)
+    # bucketed_values_dict_pd.to_csv('bucketed_values_dict_pd.csv', index=False)
     
 
     #########Add bucketed values to final report if bucketing is applicable
