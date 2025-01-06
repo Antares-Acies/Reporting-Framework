@@ -265,7 +265,7 @@ def evaluate_condition(df, condition):
     df_column = df[condition_column_name]
     ####### Convert the column to the specified datatype
     try:
-        if condition_datatype == 'int':
+        if condition_datatype == 'Integer':
             df_column = df[condition_column_name].astype(int)
         elif condition_datatype == 'Numeric' or condition_datatype == 'Float':
             df_column = df[condition_column_name].astype(float)
@@ -285,7 +285,7 @@ def evaluate_condition(df, condition):
     condition_value = condition['condition_value']
     # Convert condition_value to the specified datatype
     try:
-        if condition_datatype == 'int':
+        if condition_datatype == 'Integer':
             value = int(condition_value)
         elif condition_datatype == 'Numeric' or condition_datatype == 'Float':
             value = float(condition_value)
@@ -740,7 +740,8 @@ for idx, scenario in grouped_scenarios.iterrows():
             # Get the bucketing_rule_set for this rule_id
             bucketing_rule_row = bucket_rule_mapping[bucket_rule_mapping['reporting_rule_id'] == rule_set]
             if not bucketing_rule_row.empty:
-                bucketing_rule_set = bucketing_rule_row['unweighted_value'].values[0]
+                #changed unweighted to bucketing_rule
+                bucketing_rule_set = bucketing_rule_row['bucketing_rule'].values[0]
                 adjustment_rule = bucketing_rule_row.get('adjustment_rule', np.nan).values[0]
                 # Get the bucketing type
                 bucketing_type_row = bucketing_type[bucketing_type['bucketing_rule_set'] == bucketing_rule_set]
