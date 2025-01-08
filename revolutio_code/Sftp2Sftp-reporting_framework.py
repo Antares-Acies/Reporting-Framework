@@ -426,7 +426,7 @@ def evaluate_condition(df, condition):
 
     # Convert the column to the specified datatype
     try:
-        if condition_datatype == "int":
+        if condition_datatype == "Integer":
             df_column = df[condition_column_name].astype(int)
         elif condition_datatype == "Numeric" or condition_datatype == "Float":
             df_column = df[condition_column_name].astype(float)
@@ -448,7 +448,7 @@ def evaluate_condition(df, condition):
     condition_value = condition["condition_value"]
     # Convert condition_value to the specified datatype
     try:
-        if condition_datatype == "int":
+        if condition_datatype == "Integer":
             value = int(condition_value)
         elif condition_datatype == "Numeric" or condition_datatype == "Float":
             value = float(condition_value)
