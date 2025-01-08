@@ -1204,87 +1204,104 @@ for idx, scenario in grouped_scenarios.iterrows():
             logging.warning(f"No currency_column found for table {sheet_name}")
 
     global apply_rule_based_bucketing
-
-    def apply_rule_based_bucketing(
-        df, bucketing_rule_set, value_source_column, adjustment_rule=None
-    ):
+    def apply_rule_based_bucketing(df, bucketing_rule_set, value_source_column, adjustment_rule=None):
         """
         Applies rule-based bucketing to the DataFrame and returns bucketed values.
         """
-        logging.warning(
-            f"Applying rule-based bucketing for bucketing_rule_set: {bucketing_rule_set}"
-        )
-        bucketing_conditions = rule_based_bucketing[
-            rule_based_bucketing["bucketing_rule_set"] == bucketing_rule_set
-        ]
+        logging.warning(f"Applying rule-based bucketing for bucketing_rule_set: {bucketing_rule_set}")
+        bucketing_conditions = rule_based_bucketing[rule_based_bucketing['bucketing_rule_set'] == bucketing_rule_set]
         bucketed_data = []
-
-        for bucket_id in bucketing_conditions["bucket_id"].unique():
-            bucket_conditions = bucketing_conditions[
-                bucketing_conditions["bucket_id"] == bucket_id
-            ]
+        
+        for bucket_id in bucketing_conditions['bucket_id'].unique():
+            bucket_conditions = bucketing_conditions[bucketing_conditions['bucket_id'] == bucket_id]
             temp_df = df.copy()
-
+        
             # Apply conditions for each bucket
             for idx, condition in bucket_conditions.iterrows():
-                if "tenor" in condition and "tenor_unit" in condition:
-                    # Handle tenor and tenor_unit as per your logic
-                    pass  # Omitted for brevity
+                logging.warning(f"  ")
+                logging.warning(f"  ")
+                if 'tenor' in condition and 'tenor_unit' in condition:
+                    if pd.notnull(condition['tenor']) and pd.notnull(condition['tenor_unit']):
+                        tenor_unit = condition['tenor_unit'].lower()  # Normalize to lowercase
+                
+                        if tenor_unit == 'd':  # Days
+                            new_date = reporting_date + pd.Timedelta(days=condition['tenor'])
+                        elif tenor_unit == 'm':  # Months
+                            new_date = reporting_date + relativedelta(months=condition['tenor'])
+                        elif tenor_unit == 'q':  # Quarters
+                            new_date = reporting_date + relativedelta(months=condition['tenor'] * 3)
+                        elif tenor_unit == 'y':  # Years
+                            new_date = reporting_date + relativedelta(years=condition['tenor'])
+                        else:
+                            new_date = None
+                            calculated_time_to_maturity = None
+                            logging.warning(f"Invalid tenor_unit: {tenor_unit}")
+                
+                        if new_date is not None:
+                            if condition['condition_datatype'] == 'Date':
+                                condition['condition_value'] = new_date
+                                logging.warning(f"Calculated date: {new_date}")
+                            elif condition['condition_datatype'] == 'Numeric':
+                                days_difference = (new_date - reporting_date).days
+                                calculated_time_to_maturity = days_difference / 365
+                                condition['condition_value'] = calculated_time_to_maturity
+                                logging.warning(f"Calculated time to maturity: {calculated_time_to_maturity}")
+                            else:
+                                condition['condition_value'] = None
+                                logging.warning("Failed to calculate condition value due to invalid condition dataype.")    
+                        else:
+                            condition['condition_value'] = None
+                            logging.warning("Failed to calculate new_date due to invalid tenor_unit.")
+                    else:
+                        logging.warning("Tenor or tenor_unit is null.")
                 else:
-                    logging.warning(
-                        "Tenor or tenor_unit is missing from condition."
-                    )
-
+                    logging.warning("Tenor or tenor_unit is missing from condition.")
+                
+                
+                logging.warning(f" apply rule based bucketing before filter lenght {len(temp_df)}")
+                # logging.warning(f" print temp_df {temp_df}")
                 condition_result = evaluate_condition(temp_df, condition)
                 temp_df = temp_df[condition_result]
+                
+                logging.warning(f" apply rule based bucketing  after filter lenght {len(temp_df)}")
+                logging.warning(f"  temp_df {temp_df}")
+                
                 if temp_df.empty:
                     break
-
+    
             if not temp_df.empty:
                 # Tag the data with bucket_id for drill-down report
-                temp_df["bucket_id"] = bucket_id
+                temp_df['bucket_id'] = bucket_id
                 bucketed_data.append(temp_df)
-
+        
+        logging.warning(f" bucketed_data: {bucketed_data}")
         if bucketed_data:
             # Combine all bucketed data
             df_bucketed = pd.concat(bucketed_data, ignore_index=True)
         else:
             # If no bucketed data, create an empty df_bucketed
-            df_bucketed = pd.DataFrame(
-                columns=df.columns.tolist() + ["bucket_id"]
-            )
-
+            df_bucketed = pd.DataFrame(columns=df.columns.tolist() + ['bucket_id'])
+        
         # Apply adjustments if adjustment_rule is provided
         if pd.notna(adjustment_rule):
-            logging.warning(
-                f"Applying adjustments using adjustment_rule: {adjustment_rule}"
-            )
-            adjusted_bucketed_values, adjusted_df = apply_bucket_adjustments(
-                df_bucketed, value_source_column, adjustment_rule
-            )
+            logging.warning(f"Applying adjustments using adjustment_rule: {adjustment_rule}")
+            adjusted_bucketed_values, adjusted_df = apply_bucket_adjustments(df_bucketed, value_source_column, adjustment_rule)
             # Logging the bucketed values after adjustment
-            logging.warning(
-                f"Bucketed values after adjustment: {adjusted_bucketed_values}"
-            )
+            logging.warning(f"Bucketed values after adjustment: {adjusted_bucketed_values}")
             # Update df_bucketed with adjusted_df
             df_bucketed = adjusted_df
         else:
             logging.warning("No adjustment rule provided.")
             # Calculate bucketed_values from df_bucketed
-            adjusted_bucketed_values = (
-                df_bucketed.groupby("bucket_id")[value_source_column]
-                .sum()
-                .to_dict()
-            )
-
+            adjusted_bucketed_values = df_bucketed.groupby('bucket_id')[value_source_column].sum().to_dict()
+        
         # Logging the final bucketed values
         logging.warning(f"Final bucketed values: {adjusted_bucketed_values}")
-
+        
         # Return adjusted_bucketed_values
         return adjusted_bucketed_values
-
+    
     global apply_bucket_adjustments
-
     def apply_bucket_adjustments(df, value_source_column, adjustment_rule):
         """
         Applies adjustments to the bucketed values based on the adjustment_rule.
