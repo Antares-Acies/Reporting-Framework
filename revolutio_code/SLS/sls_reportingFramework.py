@@ -1,3 +1,6 @@
+#SLS - Report
+import logging
+logging.warning("Running SLS-Report")
 import numpy as np
 import numpy as np
 import logging
@@ -1738,7 +1741,7 @@ drill_down_report.to_csvfile_path_outputs_drill_down_report, index=False)
 
 
 output_data = output_final_report_format
-
+logging.warning("End of SLS-Report")
 
 
 

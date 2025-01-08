@@ -1,4 +1,6 @@
- 
+#NFSR REPORT
+import logging
+logging.warning("Running NSFR Report")
 import numpy as np
 import logging
 import pandas as pd
@@ -1604,6 +1606,7 @@ for idx, scenario in grouped_scenarios.iterrows():
     final_report_format['scenario_analysis_id'] = scenario_analysis_id
     rule_group_def_scenario['scenario_analysis_id'] = scenario_analysis_id
     rule_def_scenario['scenario_analysis_id'] = scenario_analysis_id
+
     
     
     bucketed_values_dict_pd =  pd.DataFrame(bucketed_values_dict)
@@ -1684,6 +1687,4 @@ output_final_report_format['reporting_date'] = Reporting_Date
 output_data = output_final_report_format
 
 
-
-
-
+logging.warning("End of NSFR Report")

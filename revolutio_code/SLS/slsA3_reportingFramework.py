@@ -1,3 +1,6 @@
+#SLS A3 REPORT
+import logging 
+logging.warning("Running SLS-A3 Report")
 import numpy as np
 import numpy as np
 import logging
@@ -1643,3 +1646,4 @@ output_data = output_final_report_format.astype(str)
 logging.warning("End of reporting framework for SLS A3")
 
 
+logging.warning("End of SLS A3 Report")

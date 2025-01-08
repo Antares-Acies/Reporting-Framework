@@ -1,4 +1,6 @@
-
+import logging
+#IRS-TGA REPORT
+logging.warning("Running IRS-TGA integration report")
 import numpy as np
 import numpy as np
 import logging
@@ -1672,3 +1674,4 @@ output_final_report_format['reporting_currency'] = Reporting_Currency
 output_final_report_format['entity'] = Legal_entity
 
 output_data = output_final_report_format
+logging.warning("End of IRS-TGA Report")

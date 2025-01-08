@@ -1,3 +1,6 @@
+#Report Name: LCR Report
+import logging
+logging.warning("Running LCR Report")
 import numpy as np
 import numpy as np
 import logging
@@ -1627,6 +1630,7 @@ logging.warning("Processing completed for all unique scenarios.")
 output_final_report_format['reporting_date'] = Reporting_Date
 output_data = output_final_report_format
 
+logging.warning("Completed Running LCR Report")
 
 
 
