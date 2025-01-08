@@ -1076,7 +1076,7 @@ for idx, scenario in grouped_scenarios.iterrows():
             ]
             if not bucketing_rule_row.empty:
                 bucketing_rule_set = bucketing_rule_row[
-                    "unweighted_value"
+                    "bucketing_rule"
                 ].values[0]
                 adjustment_rule = bucketing_rule_row.get(
                     "adjustment_rule", np.nan
