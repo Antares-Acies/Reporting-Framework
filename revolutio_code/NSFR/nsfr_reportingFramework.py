@@ -11,6 +11,7 @@ from dateutil.relativedelta import relativedelta
 
 pd.set_option('display.max_rows', None)
 
+report_name = "NSFR_Report"
 
 logging.warning('start of the editor')
 ## Importing all system tables
@@ -419,7 +420,7 @@ def evaluate_condition(df, condition):
 
     # Convert the column to the specified datatype
     try:
-        if condition_datatype == 'int':
+        if condition_datatype == 'Integer':
             df_column = df[condition_column_name].astype(int)
         elif condition_datatype == 'Numeric' or condition_datatype == 'Float':
             df_column = df[condition_column_name].astype(float)
@@ -439,7 +440,7 @@ def evaluate_condition(df, condition):
     condition_value = condition['condition_value']
     # Convert condition_value to the specified datatype
     try:
-        if condition_datatype == 'int':
+        if condition_datatype == 'Integer':
             value = int(condition_value)
         elif condition_datatype == 'Numeric' or condition_datatype == 'Float':
             value = float(condition_value)
@@ -916,7 +917,7 @@ for idx, scenario in grouped_scenarios.iterrows():
             # Get the bucketing_rule_set for this rule_id
             bucketing_rule_row = bucket_rule_mapping[bucket_rule_mapping['reporting_rule_id'] == rule_set]
             if not bucketing_rule_row.empty:
-                bucketing_rule_set = bucketing_rule_row['unweighted_value'].values[0]
+                bucketing_rule_set = bucketing_rule_row['bucketing_rule'].values[0]
                 adjustment_rule = bucketing_rule_row.get('adjustment_rule', np.nan).values[0]
                 # Get the bucketing type
                 bucketing_type_row = bucketing_type[bucketing_type['bucketing_rule_set'] == bucketing_rule_set]
@@ -1002,6 +1003,7 @@ for idx, scenario in grouped_scenarios.iterrows():
             logging.warning(f"No currency_column found for table {sheet_name}")
 
     global apply_rule_based_bucketing
+    
     def apply_rule_based_bucketing(df, bucketing_rule_set, value_source_column, adjustment_rule=None):
         """
         Applies rule-based bucketing to the DataFrame and returns bucketed values.
@@ -1016,14 +1018,54 @@ for idx, scenario in grouped_scenarios.iterrows():
         
             # Apply conditions for each bucket
             for idx, condition in bucket_conditions.iterrows():
+                logging.warning(f"  ")
+                logging.warning(f"  ")
                 if 'tenor' in condition and 'tenor_unit' in condition:
-                    # Handle tenor and tenor_unit as per your logic
-                    pass  # Omitted for brevity
+                    if pd.notnull(condition['tenor']) and pd.notnull(condition['tenor_unit']):
+                        tenor_unit = condition['tenor_unit'].lower()  # Normalize to lowercase
+                
+                        if tenor_unit == 'd':  # Days
+                            new_date = reporting_date + pd.Timedelta(days=condition['tenor'])
+                        elif tenor_unit == 'm':  # Months
+                            new_date = reporting_date + relativedelta(months=condition['tenor'])
+                        elif tenor_unit == 'q':  # Quarters
+                            new_date = reporting_date + relativedelta(months=condition['tenor'] * 3)
+                        elif tenor_unit == 'y':  # Years
+                            new_date = reporting_date + relativedelta(years=condition['tenor'])
+                        else:
+                            new_date = None
+                            calculated_time_to_maturity = None
+                            logging.warning(f"Invalid tenor_unit: {tenor_unit}")
+                
+                        if new_date is not None:
+                            if condition['condition_datatype'] == 'Date':
+                                condition['condition_value'] = new_date
+                                logging.warning(f"Calculated date: {new_date}")
+                            elif condition['condition_datatype'] == 'Numeric':
+                                days_difference = (new_date - reporting_date).days
+                                calculated_time_to_maturity = days_difference / 365
+                                condition['condition_value'] = calculated_time_to_maturity
+                                logging.warning(f"Calculated time to maturity: {calculated_time_to_maturity}")
+                            else:
+                                condition['condition_value'] = None
+                                logging.warning("Failed to calculate condition value due to invalid condition dataype.")    
+                        else:
+                            condition['condition_value'] = None
+                            logging.warning("Failed to calculate new_date due to invalid tenor_unit.")
+                    else:
+                        logging.warning("Tenor or tenor_unit is null.")
                 else:
                     logging.warning("Tenor or tenor_unit is missing from condition.")
-                    
+                
+                
+                logging.warning(f" apply rule based bucketing before filter lenght {len(temp_df)}")
+                # logging.warning(f" print temp_df {temp_df}")
                 condition_result = evaluate_condition(temp_df, condition)
                 temp_df = temp_df[condition_result]
+                
+                logging.warning(f" apply rule based bucketing  after filter lenght {len(temp_df)}")
+                logging.warning(f"  temp_df {temp_df}")
+                
                 if temp_df.empty:
                     break
     
@@ -1032,6 +1074,7 @@ for idx, scenario in grouped_scenarios.iterrows():
                 temp_df['bucket_id'] = bucket_id
                 bucketed_data.append(temp_df)
         
+        logging.warning(f" bucketed_data: {bucketed_data}")
         if bucketed_data:
             # Combine all bucketed data
             df_bucketed = pd.concat(bucketed_data, ignore_index=True)
@@ -1057,7 +1100,7 @@ for idx, scenario in grouped_scenarios.iterrows():
         
         # Return adjusted_bucketed_values
         return adjusted_bucketed_values
-        
+      
     global apply_bucket_adjustments
     def apply_bucket_adjustments(df, value_source_column, adjustment_rule):
         """
@@ -1684,7 +1727,26 @@ for idx, scenario in grouped_scenarios.iterrows():
     # End of scenario loop
 logging.warning("Processing completed for all unique scenarios.")
 output_final_report_format['reporting_date'] = Reporting_Date
+
+dir_path = '/opt/revolutio/Platform_Configs/alm_data/'
+
+file_name_output_final_report_format = f"{report_name}_{Legal_Entity}_{Reporting_Date}_output_final_report_format.csv"
+final_path_output_final_report_format = f"{dir_path}{file_name_output_final_report_format}"
+
+file_name_rule_output = f"{report_name}_{Legal_Entity}_{Reporting_Date}_file_name_rule_output.csv"
+final_path_rule_output = f"{dir_path}{file_name_rule_output}"
+
+file_name_rule_group_output = f"{report_name}_{Legal_Entity}_{Reporting_Date}_file_name_rule_group_output.csv"
+final_path_rule_group_output = f"{dir_path}{file_name_rule_group_output}"
+
+logging.warning(f"Writing the {file_name_output_final_report_format} to {final_path_output_final_report_format}")
+final_report_format.to_csv(final_path_output_final_report_format, index=False)
+logging.warning("")
+logging.warning(f"Writing the {file_name_rule_output} to {final_path_rule_output}")
+rule_def.to_csv(final_path_rule_output, index=False)
+logging.warning("")
+logging.warning(f"Writing the {file_name_rule_group_output} to {final_path_rule_group_output}")
+rule_group_def.to_csv(final_path_rule_group_output, index=False)
+
 output_data = output_final_report_format
-
-
 logging.warning("End of NSFR Report")

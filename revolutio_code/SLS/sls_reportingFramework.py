@@ -1736,7 +1736,7 @@ rule_def_scenario.to_csv(file_path_outputs_rule_def_scenario, index=False)
 
 file_path_outputs_drill_down_report = '/opt/revolutio/Platform_Configs/alm_data/drill_down_report.csv'
 logging.warning(f"Writing rule_group_def_scenario to {file_path_outputs_drill_down_report}")
-drill_down_report.to_csvfile_path_outputs_drill_down_report, index=False)
+drill_down_report.to_csv(file_path_outputs_drill_down_report, index=False)
 
 
 
