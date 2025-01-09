@@ -947,6 +947,7 @@ for idx, scenario in grouped_scenarios.iterrows():
             logging.warning(f"No currency_column found for table {sheet_name}")
 
     global apply_rule_based_bucketing
+    
     def apply_rule_based_bucketing(df, bucketing_rule_set, value_source_column, adjustment_rule=None):
         """
         Applies rule-based bucketing to the DataFrame and returns bucketed values.
@@ -961,14 +962,54 @@ for idx, scenario in grouped_scenarios.iterrows():
         
             # Apply conditions for each bucket
             for idx, condition in bucket_conditions.iterrows():
+                logging.warning(f"  ")
+                logging.warning(f"  ")
                 if 'tenor' in condition and 'tenor_unit' in condition:
-                    # Handle tenor and tenor_unit as per your logic
-                    pass  # Omitted for brevity
+                    if pd.notnull(condition['tenor']) and pd.notnull(condition['tenor_unit']):
+                        tenor_unit = condition['tenor_unit'].lower()  # Normalize to lowercase
+                
+                        if tenor_unit == 'd':  # Days
+                            new_date = reporting_date + pd.Timedelta(days=condition['tenor'])
+                        elif tenor_unit == 'm':  # Months
+                            new_date = reporting_date + relativedelta(months=condition['tenor'])
+                        elif tenor_unit == 'q':  # Quarters
+                            new_date = reporting_date + relativedelta(months=condition['tenor'] * 3)
+                        elif tenor_unit == 'y':  # Years
+                            new_date = reporting_date + relativedelta(years=condition['tenor'])
+                        else:
+                            new_date = None
+                            calculated_time_to_maturity = None
+                            logging.warning(f"Invalid tenor_unit: {tenor_unit}")
+                
+                        if new_date is not None:
+                            if condition['condition_datatype'] == 'Date':
+                                condition['condition_value'] = new_date
+                                logging.warning(f"Calculated date: {new_date}")
+                            elif condition['condition_datatype'] == 'Numeric':
+                                days_difference = (new_date - reporting_date).days
+                                calculated_time_to_maturity = days_difference / 365
+                                condition['condition_value'] = calculated_time_to_maturity
+                                logging.warning(f"Calculated time to maturity: {calculated_time_to_maturity}")
+                            else:
+                                condition['condition_value'] = None
+                                logging.warning("Failed to calculate condition value due to invalid condition dataype.")    
+                        else:
+                            condition['condition_value'] = None
+                            logging.warning("Failed to calculate new_date due to invalid tenor_unit.")
+                    else:
+                        logging.warning("Tenor or tenor_unit is null.")
                 else:
                     logging.warning("Tenor or tenor_unit is missing from condition.")
-                    
+                
+                
+                logging.warning(f" apply rule based bucketing before filter lenght {len(temp_df)}")
+                # logging.warning(f" print temp_df {temp_df}")
                 condition_result = evaluate_condition(temp_df, condition)
                 temp_df = temp_df[condition_result]
+                
+                logging.warning(f" apply rule based bucketing  after filter lenght {len(temp_df)}")
+                logging.warning(f"  temp_df {temp_df}")
+                
                 if temp_df.empty:
                     break
     
@@ -977,6 +1018,7 @@ for idx, scenario in grouped_scenarios.iterrows():
                 temp_df['bucket_id'] = bucket_id
                 bucketed_data.append(temp_df)
         
+        logging.warning(f" bucketed_data: {bucketed_data}")
         if bucketed_data:
             # Combine all bucketed data
             df_bucketed = pd.concat(bucketed_data, ignore_index=True)
@@ -1003,6 +1045,7 @@ for idx, scenario in grouped_scenarios.iterrows():
         # Return adjusted_bucketed_values
         return adjusted_bucketed_values
         
+    
     global apply_bucket_adjustments
     def apply_bucket_adjustments(df, value_source_column, adjustment_rule):
         """
