@@ -1023,10 +1023,17 @@ for idx, scenario in grouped_scenarios.iterrows():
                             logging.warning(f"Invalid tenor_unit: {tenor_unit}")
                 
                         if new_date is not None:
-                            days_difference = (new_date - reporting_date).days
-                            calculated_time_to_maturity = days_difference / 365
-                            condition['condition_value'] = calculated_time_to_maturity
-                            logging.warning(f"Calculated time to maturity: {calculated_time_to_maturity}")
+                            if condition['condition_datatype'] == 'Date':
+                                condition['condition_value'] = new_date
+                                logging.warning(f"Calculated date: {new_date}")
+                            elif condition['condition_datatype'] == 'Numeric':
+                                days_difference = (new_date - reporting_date).days
+                                calculated_time_to_maturity = days_difference / 365
+                                condition['condition_value'] = calculated_time_to_maturity
+                                logging.warning(f"Calculated time to maturity: {calculated_time_to_maturity}")
+                            else:
+                                condition['condition_value'] = None
+                                logging.warning("Failed to calculate condition value due to invalid condition dataype.")    
                         else:
                             condition['condition_value'] = None
                             logging.warning("Failed to calculate new_date due to invalid tenor_unit.")
@@ -1078,7 +1085,7 @@ for idx, scenario in grouped_scenarios.iterrows():
         
         # Return adjusted_bucketed_values
         return adjusted_bucketed_values
- 
+    
         
     global apply_bucket_adjustments
     def apply_bucket_adjustments(df, value_source_column, adjustment_rule):
