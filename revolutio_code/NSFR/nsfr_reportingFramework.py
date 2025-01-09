@@ -1688,6 +1688,7 @@ logging.warning("Processing completed for all unique scenarios.")
 output_final_report_format['reporting_date'] = Reporting_Date
 
 dir_path = '/opt/revolutio/Platform_Configs/alm_data/'
+report_name = "NSFR Report"
 
 file_name_output_final_report_format = f"{report_name}_{Legal_Entity}_{Reporting_Date}_output_final_report_format.csv"
 final_path_output_final_report_format = f"{dir_path}{file_name_output_final_report_format}"

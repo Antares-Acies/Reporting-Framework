@@ -1635,6 +1635,30 @@ output_data = output_final_report_format
 logging.warning("Completed Running LCR Report")
 
 
+report_name = "LCR Report"
+
+file_name_output_final_report_format = f"{report_name}_{Legal_Entity}_{Reporting_Date}_output_final_report_format.csv"
+final_path_output_final_report_format = f"{dir_path}{file_name_output_final_report_format}"
+
+file_name_rule_output = f"{report_name}_{Legal_Entity}_{Reporting_Date}_file_name_rule_output.csv"
+final_path_rule_output = f"{dir_path}{file_name_rule_output}"
+
+file_name_rule_group_output = f"{report_name}_{Legal_Entity}_{Reporting_Date}_file_name_rule_group_output.csv"
+final_path_rule_group_output = f"{dir_path}{file_name_rule_group_output}"
+
+logging.warning(f"Writing the {file_name_output_final_report_format} to {final_path_output_final_report_format}")
+final_report_format.to_csv(final_path_output_final_report_format, index=False)
+logging.warning("")
+logging.warning(f"Writing the {file_name_rule_output} to {final_path_rule_output}")
+rule_def.to_csv(final_path_rule_output, index=False)
+logging.warning("")
+logging.warning(f"Writing the {file_name_rule_group_output} to {final_path_rule_group_output}")
+rule_group_def.to_csv(final_path_rule_group_output, index=False)
+
+output_data = output_final_report_format
+logging.warning("End of LCR Report")
+
+
 
 
 
