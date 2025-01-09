@@ -24,49 +24,8 @@ valuation_report=valuation_report.sort_index()
 gl_balance = Data23.astype('object')
 gl_balance= gl_balance.sort_index()
 manual_input = Data4.astype('object')
-
-# raise Exception(f" {len(manual_input)}")
-
-# Cashflow Data
-# Get unique product variants
-product_variants_available = list(cashflow_report['product_variant_name'].unique())
-final_cashflow_report = pd.DataFrame()
-# Loop through each product variant
-for product in product_variants_available:
-    # Filter data for the current product variant
-    filtered_cashflow_report = cashflow_report[cashflow_report['product_variant_name'] == product]
-    
-    # Find the maximum created_date for the current product variant
-    max_date = filtered_cashflow_report['created_date'].max()
-    
-    # Filter data for the maximum created_date
-    filtered_cashflow_report = filtered_cashflow_report[filtered_cashflow_report['created_date'] == max_date]
-    
-    # Append the filtered data to the final DataFrame
-    final_cashflow_report = pd.concat([final_cashflow_report, filtered_cashflow_report], ignore_index=True)
-
-cashflow_report = final_cashflow_report.astype('object')
-cashflow_report = cashflow_report.sort_index()
-# raise Exception('line 80')
-## Valuation report data
-product_variants_available = list(valuation_report['product_variant_name'].unique())
 final_valuation_report = pd.DataFrame()
-# Loop through each product variant
-for product in product_variants_available:
-    # Filter valuation data for the current product variant and specified conditions
-    filtered_valuation_report = valuation_report.loc[valuation_report['product_variant_name'] == product]
-
-    # Find the maximum created_date
-    max_date = filtered_valuation_report['created_date'].max()
-    
-    # Filter data for the maximum created_date
-    filtered_valuation_report = filtered_valuation_report.loc[filtered_valuation_report['created_date'] == max_date]
-    
-    # Append the filtered data to the final DataFrame
-    final_valuation_report = pd.concat([final_valuation_report, filtered_valuation_report], ignore_index=True)
-
-valuation_report = final_valuation_report.astype('object')
-valuation_report = valuation_report.sort_index()
+# raise Exception(f" {len(manual_input)}")
 
 # Read all master tables
 
