@@ -169,15 +169,8 @@ def dynamic_merge(merge_master, dataframes):
         logging.warning(f"Before merge: {left_table} shape = {left_df.shape}")
         logging.warning(f"Before merge: {right_table} shape = {right_df.shape}")
 
-        # Build the actual list of columns we want to merge on
-        # i.e. 'position_data_+_external_rating' if you have a prefix in your real code
-        # For demonstration, here I assume no prefix. 
-        # Or if you do have a prefix, adapt as needed:
         left_on = [f"{left_table}_+_{k}" for k in left_keys]
         right_on = [f"{right_table}_+_{k}" for k in right_keys]
-        # But if your columns are not prefixed, you can just do:
-        # left_on = left_keys
-        # right_on = right_keys
         
         # --- 3. Merge ---
         merged_df = pd.merge(
