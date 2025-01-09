@@ -861,7 +861,7 @@ for idx, scenario in grouped_scenarios.iterrows():
             # Get the bucketing_rule_set for this rule_id
             bucketing_rule_row = bucket_rule_mapping[bucket_rule_mapping['reporting_rule_id'] == rule_set]
             if not bucketing_rule_row.empty:
-                bucketing_rule_set = bucketing_rule_row['unweighted_value'].values[0]
+                bucketing_rule_set = bucketing_rule_row['bucketing_rule'].values[0]
                 adjustment_rule = bucketing_rule_row.get('adjustment_rule', np.nan).values[0]
                 # Get the bucketing type
                 bucketing_type_row = bucketing_type[bucketing_type['bucketing_rule_set'] == bucketing_rule_set]
