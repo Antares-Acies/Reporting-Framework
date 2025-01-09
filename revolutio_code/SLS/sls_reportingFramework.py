@@ -1718,26 +1718,27 @@ output_final_report_format['scenario_analysis_id'] = Currency_Scenario_Id
 logging.warning(f"End of reporting framework and writing four outputs to a different path as csv.")
 
 # Specify the file path where you want to save the CSV file
+report_name = "SLS_Report"
+dir_path = '/opt/revolutio/Platform_Configs/alm_data/'
 
-file_path_outputs_output_final_report_format = '/opt/revolutio/Platform_Configs/alm_data/output_final_report_format.csv'
-logging.warning(f"Writing outputs_output_final_report_format to {file_path_outputs_output_final_report_format}")
-output_final_report_format.to_csv(file_path_outputs_output_final_report_format, index=False)
+file_name_output_final_report_format = f"{report_name}_{Legal_Entity}_{Reporting_Date}_output_final_report_format.csv"
+final_path_output_final_report_format = f"{dir_path}{file_name_output_final_report_format}"
 
+file_name_rule_output = f"{report_name}_{Legal_Entity}_{Reporting_Date}_file_name_rule_output.csv"
+final_path_rule_output = f"{dir_path}{file_name_rule_output}"
 
-file_path_outputs_rule_group_def_scenario = '/opt/revolutio/Platform_Configs/alm_data/rule_group_def_scenario.csv'
-logging.warning(f"Writing rule_group_def_scenario to {file_path_outputs_rule_group_def_scenario}")
-rule_group_def_scenario.to_csv(file_path_outputs_rule_group_def_scenario, index=False)
-
-
-file_path_outputs_rule_def_scenario = '/opt/revolutio/Platform_Configs/alm_data/rule_def_scenario.csv'
-logging.warning(f"Writing rule_group_def_scenario to {file_path_outputs_rule_def_scenario}")
-rule_def_scenario.to_csv(file_path_outputs_rule_def_scenario, index=False)
+file_name_rule_group_output = f"{report_name}_{Legal_Entity}_{Reporting_Date}_file_name_rule_group_output.csv"
+final_path_rule_group_output = f"{dir_path}{file_name_rule_group_output}"
 
 
-file_path_outputs_drill_down_report = '/opt/revolutio/Platform_Configs/alm_data/drill_down_report.csv'
-logging.warning(f"Writing rule_group_def_scenario to {file_path_outputs_drill_down_report}")
-drill_down_report.to_csv(file_path_outputs_drill_down_report, index=False)
-
+logging.warning(f"Writing the {file_name_output_final_report_format} to {final_path_output_final_report_format}")
+final_report_format.to_csv(final_path_output_final_report_format, index=False)
+logging.warning("")
+logging.warning(f"Writing the {file_name_rule_output} to {final_path_rule_output}")
+rule_def.to_csv(final_path_rule_output, index=False)
+logging.warning("")
+logging.warning(f"Writing the {file_name_rule_group_output} to {final_path_rule_group_output}")
+rule_group_def.to_csv(final_path_rule_group_output, index=False)
 
 
 output_data = output_final_report_format
