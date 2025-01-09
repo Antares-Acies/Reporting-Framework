@@ -50,49 +50,8 @@ manual_input = Data17.astype('object') #NRO
 manual_input = manual_input.sort_index()
 quoted_security_data = Data5.astype('object')
 quoted_security_data = quoted_security_data.sort_index()
-
-# Cashflow Data
-# Get unique product variants
-product_variants_available = list(cashflow_report['product_variant_name'].unique())
-final_cashflow_report = pd.DataFrame()
-
-# Loop through each product variant
-for product in product_variants_available:
-    # Filter data for the current product variant
-    filtered_cashflow_report = cashflow_report[cashflow_report['product_variant_name'] == product]
-    
-    # Find the maximum created_date for the current product variant
-    max_date = filtered_cashflow_report['created_date'].max()
-    
-    # Filter data for the maximum created_date
-    filtered_cashflow_report = filtered_cashflow_report[filtered_cashflow_report['created_date'] == max_date]
-    
-    # Append the filtered data to the final DataFrame
-    final_cashflow_report = pd.concat([final_cashflow_report, filtered_cashflow_report], ignore_index=True)
-
-cashflow_report = final_cashflow_report.astype('object')
-cashflow_report = cashflow_report.sort_index()
-
-## Valuation report data
-product_variants_available = list(valuation_report['product_variant_name'].unique())
 final_valuation_report = pd.DataFrame()
 
-# Loop through each product variant
-for product in product_variants_available:
-    # Filter valuation data for the current product variant and specified conditions
-    filtered_valuation_report = valuation_report.loc[valuation_report['product_variant_name'] == product]
-
-    # Find the maximum created_date
-    max_date = filtered_valuation_report['created_date'].max()
-    
-    # Filter data for the maximum created_date
-    filtered_valuation_report = filtered_valuation_report.loc[filtered_valuation_report['created_date'] == max_date]
-    
-    # Append the filtered data to the final DataFrame
-    final_valuation_report = pd.concat([final_valuation_report, filtered_valuation_report], ignore_index=True)
-
-valuation_report = final_valuation_report.astype('object')
-valuation_report = valuation_report.sort_index()
 
 ### Import all master tables
 rating_master = Data6.astype('object') # NRO
@@ -1674,6 +1633,30 @@ output_final_report_format['reporting_date'] = Reporting_Date
 output_data = output_final_report_format
 
 logging.warning("Completed Running LCR Report")
+
+
+report_name = "LCR Report"
+
+file_name_output_final_report_format = f"{report_name}_{Legal_Entity}_{Reporting_Date}_output_final_report_format.csv"
+final_path_output_final_report_format = f"{dir_path}{file_name_output_final_report_format}"
+
+file_name_rule_output = f"{report_name}_{Legal_Entity}_{Reporting_Date}_file_name_rule_output.csv"
+final_path_rule_output = f"{dir_path}{file_name_rule_output}"
+
+file_name_rule_group_output = f"{report_name}_{Legal_Entity}_{Reporting_Date}_file_name_rule_group_output.csv"
+final_path_rule_group_output = f"{dir_path}{file_name_rule_group_output}"
+
+logging.warning(f"Writing the {file_name_output_final_report_format} to {final_path_output_final_report_format}")
+final_report_format.to_csv(final_path_output_final_report_format, index=False)
+logging.warning("")
+logging.warning(f"Writing the {file_name_rule_output} to {final_path_rule_output}")
+rule_def.to_csv(final_path_rule_output, index=False)
+logging.warning("")
+logging.warning(f"Writing the {file_name_rule_group_output} to {final_path_rule_group_output}")
+rule_group_def.to_csv(final_path_rule_group_output, index=False)
+
+output_data = output_final_report_format
+logging.warning("End of LCR Report")
 
 
 
