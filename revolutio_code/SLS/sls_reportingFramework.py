@@ -32,20 +32,20 @@ global drill_down_report_flag
 
 # Read initial dataframes
 logging.warning("Reading initial dataframes...")
-report_format = Data27
+report_format = Data19
 
 # report_format.rename(columns={'total_rsl_rsa': 'total_rsl/rsa'}, inplace=True)
-rule_group_def = Data21
+rule_group_def = Data22
 
-rule_def = Data20.astype('object')
+rule_def = Data23.astype('object')
 
-mapping_set = Data22.astype('object')
+mapping_set = Data24.astype('object')
 
-merge_master = Data9.astype('object')
+merge_master = Data14.astype('object')
 
 # Read the mapping of unique identifiers from the master Excel file
 global table_primary_keys
-table_primary_keys = Data12.astype('object')
+table_primary_keys = Data15.astype('object')
 
 
 table_primary_keys['Primary key'] = table_primary_keys.apply(
@@ -61,16 +61,16 @@ global currency_conversion_master
 global quoted_security_data
 global currency_scenario_config
 global currency_conversion_exemption
-currency_pair_master = Data11.astype('object')
+currency_pair_master = Data27.astype('object')
 
-currency_conversion_master = Data10.astype('object')
+currency_conversion_master = Data16.astype('object')
 
-quoted_security_data = Data3.astype('object')
+quoted_security_data = Data12.astype('object')
 quoted_security_data.drop_duplicates(subset = ['security_identifier'],inplace = True)
 
-currency_scenario_config = Data7
+currency_scenario_config = Data20
 
-currency_conversion_exemption = Data5
+currency_conversion_exemption = Data17
 
 currency_conversion_exemption['value_source_column'] = currency_conversion_exemption['value_source_table']  + "_+_" + currency_conversion_exemption['value_source_column']
 logging.warning("Currency-related data read successfully.")
@@ -80,7 +80,7 @@ logging.warning("Currency-related data read successfully.")
 # Read 'column_type' data to get 'bucketing_applicability' flag and columns to calculate
 logging.warning("Reading column type data...")
 global column_type
-column_type = Data23
+column_type = Data21
 
 
 
@@ -105,19 +105,19 @@ global reporting_pattern_bucketing
 global bucket_id
 global bucket_ids
 global reporting_bucketing_adjustment
-bucket_definition = Data13.astype('object')
+bucket_definition = Data1.astype('object')
 
-bucket_rule_mapping = Data15.astype('object')
+bucket_rule_mapping = Data3.astype('object')
 
-bucketing_type = Data14.astype('object')
+bucketing_type = Data2.astype('object')
 
-rule_based_bucketing = Data17.astype('object')
+rule_based_bucketing = Data5.astype('object')
 
-static_pattern_bucketing = Data18.astype('object')
+static_pattern_bucketing = Data6.astype('object')
 
-reporting_pattern_bucketing = Data19.astype('object')
+reporting_pattern_bucketing = Data7.astype('object')
 
-reporting_bucketing_adjustment = Data16.astype('object')
+reporting_bucketing_adjustment = Data4.astype('object')
 
 
 # Read bucketing-related data if any column requires bucketing
@@ -145,13 +145,13 @@ else:
 # Read limit setup data
 logging.warning("Reading limit setup data...")
 global limit_setup
-limit_setup = Data24.astype('object')
+limit_setup = Data25.astype('object')
 # limit_setup.rename(columns={'limit_value': 'limit'}, inplace=True)
 
 ## Importing all system tables
-position_data = Data1.astype('object')
-cashflow_report = Data26.astype('object')
-npa_data = Data25.astype('object')
+position_data = Data10.astype('object')
+cashflow_report = Data9.astype('object')
+npa_data = Data8.astype('object')
 
 
 # Preprocesssing
@@ -167,9 +167,10 @@ logging.warning(f" cashflow_report is: {cashflow_report.shape}")
 logging.warning(f" npa_data is: {npa_data.shape}")
 time.sleep(1)
 logging.warning(f"    ")
-gl_balance = Data2
-gl_master = Data8
-manual_input = Data4
+gl_balance = Data11
+gl_master = Data28
+manual_input = Data13
+manual_configuration = Data26
 
 logging.warning(f"  2  ")
 logging.warning(f" position_data is: {position_data.shape}")
@@ -206,6 +207,7 @@ dataframes = {
     'gl_master':gl_master,
     'manual_input':manual_input,
     'npa_data':npa_data,
+    'manual_configuration':manual_configuration
 }
 
 for key, df in dataframes.items():
@@ -249,52 +251,102 @@ def read_dataframes(dataframes):
     logging.warning("exit read_dataframe function")
     return result_dataframes
 
+
 def dynamic_merge(merge_master, dataframes):
     """
-    Dynamically merges DataFrames based on instructions in merge_master.
+    Dynamically merges DataFrames based on instructions in merge_master,
+    preserving the row-by-row order from merge_master and allowing
+    multi-key merges for consecutive lines of the same (value_source_table, condition_source_table).
+    
+    In addition, once a table is merged, the updated version will be used
+    in subsequent merges.
     """
     merged_data = {}
-    grouped_merge_instructions = merge_master.groupby(['value_source_table', 'condition_source_table'])
-    logging.warning(f"Grouped merge instructions: {grouped_merge_instructions.groups}")
-
-    for (left_table, right_table), group in grouped_merge_instructions:
+    
+    # Keep track of the current "block" of merges (same value/condition pair).
+    last_pair = None
+    accumulated_left_keys = []
+    accumulated_right_keys = []
+    
+    def do_merge_step(left_table, right_table, left_keys, right_keys):
+        """
+        Perform one merge step for a pair (left_table, right_table) over 
+        the accumulated lists of keys in left_keys and right_keys.
+        """
+        logging.warning(f"  ")
         logging.warning(f"Merging {left_table} with {right_table}")
-        left_keys = [left_table + "_+_" + key for key in group['left_key']]
-        right_keys = [right_table + "_+_" + key for key in group['right_key']]
         logging.warning(f"left_keys: {left_keys}, right_keys: {right_keys}")
+        
+        # --- 1. Determine the most up-to-date left_df and right_df ---
+        if left_table in merged_data:
+            left_df = merged_data[left_table]
+        else:
+            if left_table not in dataframes:
+                logging.warning(f"Left table {left_table} not in `dataframes`. Skipping.")
+                return
+            left_df = dataframes[left_table]
+        
+        if right_table in merged_data:
+            right_df = merged_data[right_table]
+        else:
+            if right_table not in dataframes:
+                logging.warning(f"Right table {right_table} not in `dataframes`. Skipping.")
+                return
+            right_df = dataframes[right_table]
+        
+        # --- 2. Log shapes ---
+        logging.warning(f"Before merge: {left_table} shape = {left_df.shape}")
+        logging.warning(f"Before merge: {right_table} shape = {right_df.shape}")
 
-        if right_table not in dataframes or left_table not in dataframes:
-            logging.warning(f"One or more tables needed for merging {left_table} with {right_table} are missing.")
-            continue
-
-        if left_table not in merged_data:
-            merged_data[left_table] = dataframes[left_table]
+        left_on = [f"{left_table}_+_{k}" for k in left_keys]
+        right_on = [f"{right_table}_+_{k}" for k in right_keys]
         
-        
-        logging.warning(f"before Merged {left_table} now has shape: {merged_data[left_table].shape}")
-        logging.warning(f"before Merged {left_table} now has shape: {merged_data[left_table].shape}")
-        logging.warning(f"before Merged {left_table} now has shape: {merged_data[left_table].shape}")
-        logging.warning(f" ")
-        logging.warning(f" ")
-        logging.warning(f" ")
-        logging.warning(f"Before Merged {right_table} now has shape: {dataframes[right_table].shape}")
-        logging.warning(f"Before Merged {right_table} now has shape: {dataframes[right_table].shape}")
-        logging.warning(f"Before Merged {right_table} now has shape: {dataframes[right_table].shape}")
-        
-        time.sleep(1)
-        
-        merged_data[left_table] = pd.merge(
-            left=merged_data[left_table],
-            right=dataframes[right_table],
-            left_on=left_keys,
-            right_on=right_keys,
+        # --- 3. Merge ---
+        merged_df = pd.merge(
+            left=left_df,
+            right=right_df,
+            left_on=left_on,
+            right_on=right_on,
             how='left'
         )
-        logging.warning(f"Merged {left_table} now has shape: {merged_data[left_table].shape}")
-        logging.warning(f"Merged {left_table} now has shape: {merged_data[left_table].shape}")
         
-    logging.warning("Dynamic merges completed.")
-    time.sleep(15)
+        logging.warning(f"After merge: {left_table} shape = {merged_df.shape}")
+        
+        # --- 4. Update merged_data so next merges will see the new version ---
+        merged_data[left_table] = merged_df
+
+    # Iterate row by row in the original order
+    for idx, row in merge_master.iterrows():
+        pair = (row['value_source_table'], row['condition_source_table'])
+
+        # if we're on a new pair, flush the old block
+        if last_pair is not None and pair != last_pair:
+            do_merge_step(
+                left_table=last_pair[0],
+                right_table=last_pair[1],
+                left_keys=accumulated_left_keys,
+                right_keys=accumulated_right_keys
+            )
+            accumulated_left_keys = []
+            accumulated_right_keys = []
+
+        accumulated_left_keys.append(row['left_key'])
+        accumulated_right_keys.append(row['right_key'])
+        last_pair = pair
+    
+    # final flush
+    if last_pair is not None:
+        do_merge_step(
+            left_table=last_pair[0],
+            right_table=last_pair[1],
+            left_keys=accumulated_left_keys,
+            right_keys=accumulated_right_keys
+        )
+    
+    logging.warning(f"  ")
+    logging.warning("All merges completed in config table order.")
+    time.sleep(10)
+
     return merged_data
 
 global get_all_dataframes_dict
