@@ -138,9 +138,9 @@ dataframes = {
     'currency_conversion_exemption':currency_conversion_exemption
 }
 
-logging.warning("line 128 dataframe creation")
-# raise Exception(f"line 165 {gl_balance.columns}")
-# raise Exception("LINE 136")
+for key, df in dataframes.items():
+  time.sleep(1)
+  logging.warning(f"The shape of the dataframe '{key}' is: {df.shape}")
 
 
 # raise Exception(f"{(currency_conversion_master)}")
@@ -361,7 +361,7 @@ def conversion(dataframes, currency_conversion_master, currency_conversion_rate,
         df.loc[currency_mask, column_name] = df.loc[currency_mask, column_name] * rates
         dataframes[table_name] = df
     
-    logging.warning(f" currency conversion fxn start ")
+    logging.warning(f" currency conversion fxn ended ")
     return dataframes
   
 global evaluate_condition

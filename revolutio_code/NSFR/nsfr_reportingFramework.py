@@ -93,8 +93,6 @@ currency_conversion_exemption = Data25
 currency_conversion_exemption['value_source_column'] = currency_conversion_exemption['value_source_table']  + "_+_" + currency_conversion_exemption['value_source_column']
 logging.warning("Currency-related data read successfully.")
 
-# expected_output = pd.read_excel(dataframes, sheet_name='Expected Output')
-# expected_output = expected_output[['Label ID', 'Expected Value', 'Weighted Amount']]
 # Read 'column_type' data to get 'bucketing_applicability' flag
 logging.warning("Reading column type data...")
 global column_type
@@ -195,8 +193,12 @@ dataframes = {
     'manual_input':manual_input
     
 }
-# raise Exception(f"{len(dataframes)}")
-# Function definitions (with additions for bucketing)
+
+for key, df in dataframes.items():
+  time.sleep(1)
+  logging.warning(f"The shape of the dataframe '{key}' is: {df.shape}")
+
+
 logging.warning(f"Length of Dataframes : {len(dataframes)}")
 # raise Exception(f" {len(cashflow_report)}")
 
@@ -412,7 +414,7 @@ def conversion(dataframes, currency_conversion_master, currency_conversion_rate,
         df.loc[currency_mask, column_name] = df.loc[currency_mask, column_name] * rates
         dataframes[table_name] = df
     
-    logging.warning(f" currency conversion fxn start ")
+    logging.warning(f" currency conversion fxn ended ")
     return dataframes
   
 global evaluate_condition
