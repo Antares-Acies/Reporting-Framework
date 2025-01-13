@@ -30,19 +30,19 @@ global merge_master
 
 # Read initial dataframes
 logging.warning("Reading initial dataframes...")
-report_format = Data8
+report_format = Data1
 
 # report_format.rename(columns={'total_rsl_rsa': 'total_rsl/rsa'}, inplace=True)
-rule_group_def = Data10
+rule_group_def = Data3
 
-rule_def = Data9.astype('object')
+rule_def = Data2.astype('object')
 
-mapping_set = Data11.astype('object')
+mapping_set = Data4.astype('object')
 
 if Data2.empty:
-    merge_master = Data2
+    merge_master = Data15
 else: 
-    merge_master = Data2.astype('object')
+    merge_master = Data15.astype('object')
 
 # Read the mapping of unique identifiers from the master Excel file
 
@@ -55,21 +55,21 @@ global currency_conversion_master
 global quoted_security_data
 global currency_scenario_config
 global currency_conversion_exemption
-currency_pair_master = Data3.astype('object')
+currency_pair_master = Data16.astype('object')
 
-currency_conversion_master = Data5.astype('object')
-currency_conversion_exemption = Data1.astype('object')
+currency_conversion_master = Data18.astype('object')
+currency_conversion_exemption = Data14.astype('object')
 
 
-quoted_security_data = Data7.astype('object')
+quoted_security_data = Data20.astype('object')
 quoted_security_data.drop_duplicates(subset = ['security_identifier'],inplace = True)
 
-currency_scenario_config = Data4
+currency_scenario_config = Data17
 
 # Read 'column_type' data to get 'bucketing_applicability' flag and columns to calculate
 logging.warning("Reading column type data...")
 global column_type
-column_type = Data12
+column_type = Data5
 
 
 
@@ -94,19 +94,19 @@ global reporting_pattern_bucketing
 global bucket_id
 global bucket_ids
 global reporting_bucketing_adjustment
-bucket_definition = Data14.astype('object')
+bucket_definition = Data7.astype('object')
 
-bucket_rule_mapping = Data16.astype('object')
+bucket_rule_mapping = Data9.astype('object')
 
-bucketing_type = Data15.astype('object')
+bucketing_type = Data8.astype('object')
 
-rule_based_bucketing = Data18.astype('object')
+rule_based_bucketing = Data11.astype('object')
 
-static_pattern_bucketing = Data19.astype('object')
+static_pattern_bucketing = Data12.astype('object')
 
-reporting_pattern_bucketing = Data20.astype('object')
+reporting_pattern_bucketing = Data13.astype('object')
 
-reporting_bucketing_adjustment = Data17.astype('object')
+reporting_bucketing_adjustment = Data10.astype('object')
 
 
 # Read bucketing-related data if any column requires bucketing
@@ -134,11 +134,11 @@ else:
 # Read limit setup data
 logging.warning("Reading limit setup data...")
 global limit_setup
-limit_setup = Data13.astype('object')
+limit_setup = Data6.astype('object')
 # limit_setup.rename(columns={'limit_value': 'limit'}, inplace=True)
 
 ## Importing all system tables
-sls_report = Data6.astype('object')
+sls_report = Data19.astype('object')
 
 sls_report['created_date'] = pd.to_datetime(sls_report['created_date'], dayfirst=True)
 sls_report = sls_report.loc[sls_report.groupby(['scenario_analysis_id','label_id'])['created_date'].idxmax()]
@@ -375,7 +375,7 @@ def evaluate_condition(df, condition):
 
     # Convert the column to the specified datatype
     try:
-        if condition_datatype == 'int':
+        if condition_datatype == 'Integer':
             df_column = df[condition_column_name].astype(int)
         elif condition_datatype == 'Numeric' or condition_datatype == 'Float':
             df_column = df[condition_column_name].astype(float)
@@ -395,7 +395,7 @@ def evaluate_condition(df, condition):
     condition_value = condition['condition_value']
     # Convert condition_value to the specified datatype
     try:
-        if condition_datatype == 'int':
+        if condition_datatype == 'Integer':
             value = int(condition_value)
         elif condition_datatype == 'Numeric' or condition_datatype == 'Float':
             value = float(condition_value)
@@ -874,7 +874,7 @@ for idx, scenario in grouped_scenarios.iterrows():
             # Get the bucketing_rule_set for this rule_id
             bucketing_rule_row = bucket_rule_mapping[bucket_rule_mapping['reporting_rule_id'] == rule_set]
             if not bucketing_rule_row.empty:
-                bucketing_rule_set = bucketing_rule_row['unweighted_value'].values[0]
+                bucketing_rule_set = bucketing_rule_row['bucketing_rule'].values[0]
                 adjustment_rule = bucketing_rule_row.get('adjustment_rule', np.nan).values[0]
                 # Get the bucketing type
                 bucketing_type_row = bucketing_type[bucketing_type['bucketing_rule_set'] == bucketing_rule_set]
@@ -960,6 +960,7 @@ for idx, scenario in grouped_scenarios.iterrows():
             logging.warning(f"No currency_column found for table {sheet_name}")
 
     global apply_rule_based_bucketing
+
     def apply_rule_based_bucketing(df, bucketing_rule_set, value_source_column, adjustment_rule=None):
         """
         Applies rule-based bucketing to the DataFrame and returns bucketed values.
@@ -974,14 +975,54 @@ for idx, scenario in grouped_scenarios.iterrows():
         
             # Apply conditions for each bucket
             for idx, condition in bucket_conditions.iterrows():
+                logging.warning(f"  ")
+                logging.warning(f"  ")
                 if 'tenor' in condition and 'tenor_unit' in condition:
-                    # Handle tenor and tenor_unit as per your logic
-                    pass  # Omitted for brevity
+                    if pd.notnull(condition['tenor']) and pd.notnull(condition['tenor_unit']):
+                        tenor_unit = condition['tenor_unit'].lower()  # Normalize to lowercase
+                
+                        if tenor_unit == 'd':  # Days
+                            new_date = reporting_date + pd.Timedelta(days=condition['tenor'])
+                        elif tenor_unit == 'm':  # Months
+                            new_date = reporting_date + relativedelta(months=condition['tenor'])
+                        elif tenor_unit == 'q':  # Quarters
+                            new_date = reporting_date + relativedelta(months=condition['tenor'] * 3)
+                        elif tenor_unit == 'y':  # Years
+                            new_date = reporting_date + relativedelta(years=condition['tenor'])
+                        else:
+                            new_date = None
+                            calculated_time_to_maturity = None
+                            logging.warning(f"Invalid tenor_unit: {tenor_unit}")
+                
+                        if new_date is not None:
+                            if condition['condition_datatype'] == 'Date':
+                                condition['condition_value'] = new_date
+                                logging.warning(f"Calculated date: {new_date}")
+                            elif condition['condition_datatype'] == 'Numeric':
+                                days_difference = (new_date - reporting_date).days
+                                calculated_time_to_maturity = days_difference / 365
+                                condition['condition_value'] = calculated_time_to_maturity
+                                logging.warning(f"Calculated time to maturity: {calculated_time_to_maturity}")
+                            else:
+                                condition['condition_value'] = None
+                                logging.warning("Failed to calculate condition value due to invalid condition dataype.")    
+                        else:
+                            condition['condition_value'] = None
+                            logging.warning("Failed to calculate new_date due to invalid tenor_unit.")
+                    else:
+                        logging.warning("Tenor or tenor_unit is null.")
                 else:
                     logging.warning("Tenor or tenor_unit is missing from condition.")
-                    
+                
+                
+                logging.warning(f" apply rule based bucketing before filter lenght {len(temp_df)}")
+                # logging.warning(f" print temp_df {temp_df}")
                 condition_result = evaluate_condition(temp_df, condition)
                 temp_df = temp_df[condition_result]
+                
+                logging.warning(f" apply rule based bucketing  after filter lenght {len(temp_df)}")
+                logging.warning(f"  temp_df {temp_df}")
+                
                 if temp_df.empty:
                     break
     
@@ -990,6 +1031,7 @@ for idx, scenario in grouped_scenarios.iterrows():
                 temp_df['bucket_id'] = bucket_id
                 bucketed_data.append(temp_df)
         
+        logging.warning(f" bucketed_data: {bucketed_data}")
         if bucketed_data:
             # Combine all bucketed data
             df_bucketed = pd.concat(bucketed_data, ignore_index=True)
@@ -1642,7 +1684,30 @@ for idx, scenario in grouped_scenarios.iterrows():
 logging.warning("Processing completed for all unique scenarios.")
 output_final_report_format['reporting_date'] = Reporting_Date
 output_final_report_format['reporting_currency'] = Reporting_Currency
-output_data = output_final_report_format.astype(str)
+
+report_name = "SLS-A3_Report"
+dir_path = '/opt/revolutio/Platform_Configs/alm_data/'
+
+file_name_output_final_report_format = f"{report_name}_{Legal_Entity}_{Reporting_Date}_output_final_report_format.csv"
+final_path_output_final_report_format = f"{dir_path}{file_name_output_final_report_format}"
+
+file_name_rule_output = f"{report_name}_{Legal_Entity}_{Reporting_Date}_file_name_rule_output.csv"
+final_path_rule_output = f"{dir_path}{file_name_rule_output}"
+
+file_name_rule_group_output = f"{report_name}_{Legal_Entity}_{Reporting_Date}_file_name_rule_group_output.csv"
+final_path_rule_group_output = f"{dir_path}{file_name_rule_group_output}"
+
+
+logging.warning(f"Writing the {file_name_output_final_report_format} to {final_path_output_final_report_format}")
+final_report_format.to_csv(final_path_output_final_report_format, index=False)
+logging.warning("")
+logging.warning(f"Writing the {file_name_rule_output} to {final_path_rule_output}")
+rule_def.to_csv(final_path_rule_output, index=False)
+logging.warning("")
+logging.warning(f"Writing the {file_name_rule_group_output} to {final_path_rule_group_output}")
+rule_group_def.to_csv(final_path_rule_group_output, index=False)
+
+output_data = output_final_report_format
 logging.warning("End of reporting framework for SLS A3")
 
 
