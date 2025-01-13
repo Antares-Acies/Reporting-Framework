@@ -170,29 +170,6 @@ npa_data['adjusted_outstanding_balance'] = npa_data.apply(
 
 
 
-## Valuation report data
-product_variants_available = list(valuation_report['product_variant_name'].unique())
-# final_valuation_report = pd.DataFrame()
-# # Loop through each product variant
-# for product in product_variants_available:
-#     # Filter valuation data for the current product variant and specified conditions
-#     filtered_valuation_report = valuation_report.loc[valuation_report['product_variant_name'] == product]
-
-#     # Find the maximum created_date
-#     max_date = filtered_valuation_report['created_date'].max()
-    
-#     # Filter data for the maximum created_date
-#     filtered_valuation_report = filtered_valuation_report.loc[filtered_valuation_report['created_date'] == max_date]
-    
-#     # Append the filtered data to the final DataFrame
-#     final_valuation_report = pd.concat([final_valuation_report, filtered_valuation_report], ignore_index=True)
-
-# valuation_report = final_valuation_report.astype('object')
-# valuation_report = valuation_report.sort_index()
-
-# raise Exception("all data read successfully")
-
-
 logging.warning(f" 2 len of gl master: {len(gl_master)}")
 
 global dataframes
@@ -443,7 +420,7 @@ def conversion(dataframes, currency_conversion_master, currency_conversion_rate,
         df.loc[currency_mask, column_name] = df.loc[currency_mask, column_name] * rates
         dataframes[table_name] = df
     
-    logging.warning(f" currency conversion fxn start ")
+    logging.warning(f" currency conversion fxn ended")
     return dataframes
   
 global evaluate_condition

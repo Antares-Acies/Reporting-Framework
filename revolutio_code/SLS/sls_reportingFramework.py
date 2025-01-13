@@ -432,7 +432,7 @@ def conversion(dataframes, currency_conversion_master, currency_conversion_rate,
         df.loc[currency_mask, column_name] = df.loc[currency_mask, column_name] * rates
         dataframes[table_name] = df
     
-    logging.warning(f" currency conversion fxn start ")
+    logging.warning(f" currency conversion fxn ended ")
     return dataframes
   
 global evaluate_condition
