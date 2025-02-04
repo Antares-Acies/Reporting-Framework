@@ -1303,15 +1303,14 @@ for idx, scenario in grouped_scenarios.iterrows():
         logging.warning(f"Evaluating rule group: {rule_group} and bucketing_applicability: {bucketing_applicability}")
         group_def = rule_group_def_scenario[rule_group_def_scenario['rule_group'] == rule_group]
         
-        try:
+        logging.warning(f'Rule Group Def head before sorting : {group_def.head()}')
+        try:    
             group_def['execution_order'].fillna(100000, inplace=True)
-            group_def['execution_order'] = rule_group_def_scenario['execution_order'].astype(int)
+            group_def['execution_order'] = group_def['execution_order'].astype(int)
             group_def.sort_values('execution_order', ascending=True, inplace=True)
-            logging.warning('Sorted ruel group def. using execution order.')
-            logging.warning(f'Group Def : {group_def.head()}')
-            logging.warning(f'Group Def : {group_def.tail()}')
         except KeyError:
-            logging.warning('Execution order column is not found in rule group definition.')    
+            logging.warning('Execution order is not found')    
+        logging.warning(f'Rule Group Def head after sorting : {group_def.head()}')  
 
         if len(group_def) < 1:
             logging.warning(f"Missing rule group: {rule_group}")
