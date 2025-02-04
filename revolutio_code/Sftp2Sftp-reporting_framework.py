@@ -1,21 +1,74 @@
-global final_report_format
+#Import statements
 import numpy as np
 import logging
 import pandas as pd
 import xlsxwriter
-import time, os, datetime
 global time
+import time, os, datetime
 from dateutil.relativedelta import relativedelta
-
-pd.set_option("display.max_rows", None)
 import io
 import paramiko
 
-# raise Exception(f"{config_file_name}")
+#global define tables and variables
+
+global final_report_format
+global rule_group_def
+global rule_def
+global report_format
+global mapping_set
+global merge_master
+global expected_output
+global drill_down_data
+global table_primary_keys
+global currency_conversion_exemption
+global currency_pair_master
+global currency_conversion_master
+global currency_scenario_config
+global quoted_security_data
+global calculated_columns
+global bucket_rule_mapping
+global bucket_definition
+global bucketing_type
+global rule_based_bucketing
+global static_pattern_bucketing
+global reporting_pattern_bucketing
+global reporting_bucketing_adjustment
+global bucket_ids
+global bucket_id
+global rule_def_scenario
+global rule_group_def_scenario
+global report_format_scenario
+global currency_conversion_master_scenario
+global all_dataframes_dict
+global reporting_date
+global reporting_currency
+global col_name
+global bucketed_values_dict
+
+#global define functions
+global read_dataframes
+global group_filter_data
+global filter_dataframes_by_grouped_data
+global dynamic_merge
+global get_all_dataframes_dict
+global conversion
+global evaluate_condition
+global filter_dataframes_by_currency
+global combine_bucketed_values
+global drill_down_report_flag
+global rule_group_to_bucketing_applicability
+global label_id_column_to_bucketing_applicability
+global rule_group_to_label_ids
+global evaluate_rule_set
+global bucketed_values
+global collect_drill_down_data
+global apply_rule_based_bucketing
+
+#source code starting
+pd.set_option("display.max_rows", None)# raise Exception(f"{config_file_name}")
 # Initialize SSH client
 ssh_client = paramiko.SSHClient()
 ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-
 
 # Connection details
 hostname = "20.244.30.89"
@@ -54,20 +107,12 @@ except FileNotFoundError:
 sftp_client.get(org_path, f"{local_dir}/{config_file_name}")
 logging.warning("Connection successful")
 
-
 # org_path = f"{local_dir}/AFL SLS 20.xlsx"
 org_path = f"{local_dir}/{config_file_name}"
 
 # Read the specific sheets from the workbook
 start_time = time.time()
-global rule_group_def
-global rule_def
-global report_format
-global mapping_set
-global merge_master
-global expected_output
 
-global drill_down_data
 # Read initial dataframes
 print("Reading initial dataframes...")
 report_format = pd.read_excel(org_path, sheet_name="report_format")
@@ -79,9 +124,6 @@ merge_master = pd.read_excel(org_path, sheet_name="merge_master")
 # raise Exception('line 60')
 
 # Read the mapping of unique identifiers from the master Excel file
-global table_primary_keys
-
-# Read the mapping of unique identifiers from the master Excel file
 table_primary_keys = pd.read_excel(org_path, sheet_name="source_master")
 table_primary_keys["Primary key"] = table_primary_keys.apply(
     lambda row: f"{row['source_table_name']}_+_{row['primary_key']}", axis=1
@@ -89,21 +131,12 @@ table_primary_keys["Primary key"] = table_primary_keys.apply(
 logging.warning("Initial dataframes read successfully.")
 
 # Important for reporting currency related logic
-global currency_conversion_exemption
-global currency_pair_master
-global currency_conversion_master
-global currency_scenario_config
-global quoted_security_data
 logging.warning("Reading currency-related data...")
-currency_pair_master = pd.read_excel(
-    org_path, sheet_name="currency_pair_master"
-)
+currency_pair_master = pd.read_excel(org_path, sheet_name="currency_pair_master")
 currency_conversion_master = pd.read_excel(
     org_path, sheet_name="currency_conversion_master"
 )
-quoted_security_data = pd.read_excel(
-    org_path, sheet_name="quoted_security_data"
-)
+quoted_security_data = pd.read_excel(org_path, sheet_name="quoted_security_data")
 currency_scenario_config = pd.read_excel(
     org_path, sheet_name="currency_scenario_config"
 )
@@ -122,8 +155,6 @@ logging.warning("Reading column type data...")
 column_type = pd.read_excel(org_path, sheet_name="column_type")
 
 # Get the list of columns that need to be calculated
-global calculated_columns
-# Get the list of columns that need to be calculated
 calculated_columns = column_type[column_type["calculated_column"] == "Yes"][
     "column_name"
 ].tolist()
@@ -131,32 +162,23 @@ logging.warning(f"Columns to be calculated: {calculated_columns}")
 
 # Check if bucketing is applicable for any of the columns
 global bucketing_flag_global
-bucketing_flag_global = 'Yes' if 'Yes' in column_type['bucketing_applicability'].values else 'No'
-logging.warning(f"Bucketing applicability  bucketing_flag_global  flag: {bucketing_flag_global}")
+bucketing_flag_global = (
+    "Yes" if "Yes" in column_type["bucketing_applicability"].values else "No"
+)
+logging.warning(
+    f"Bucketing applicability  bucketing_flag_global  flag: {bucketing_flag_global}"
+)
 
 
 # Read bucketing-related data
 print("Reading bucketing-related data...")
-global bucket_rule_mapping
-global bucket_definition
-global bucketing_type
-global rule_based_bucketing
-global static_pattern_bucketing
-global reporting_pattern_bucketing
-global reporting_bucketing_adjustment
-global bucket_ids
-global bucket_id
 # Read bucketing-related data if any column requires bucketing
-if 'Yes' in column_type['bucketing_applicability'].values:
+if "Yes" in column_type["bucketing_applicability"].values:
     logging.warning("Reading bucketing-related data...")
     bucket_definition = pd.read_excel(org_path, sheet_name="bucket_definition")
-    bucket_rule_mapping = pd.read_excel(
-        org_path, sheet_name="bucketing_rule_mapping"
-    )
+    bucket_rule_mapping = pd.read_excel(org_path, sheet_name="bucketing_rule_mapping")
     bucketing_type = pd.read_excel(org_path, sheet_name="bucketing_type")
-    rule_based_bucketing = pd.read_excel(
-        org_path, sheet_name="rule_based_bucketing"
-    )
+    rule_based_bucketing = pd.read_excel(org_path, sheet_name="rule_based_bucketing")
     rule_based_bucketing["condition_column_name"] = (
         rule_based_bucketing["condition_source_table"]
         + "_+_"
@@ -188,28 +210,17 @@ limit_setup = pd.read_excel(org_path, sheet_name="limit_setup")
 logging.warning("Limit setup data read successfully.")
 
 # Function definitions (with additions for bucketing and new requirements)
-global rule_def_scenario
-global rule_group_def_scenario
-
 
 def read_dataframes(org_path):
     """
     Reads required sheets from the Excel file based on unique source tables in rule_def and rule_group_def.
     """
-    unique_source_sheet = (
-        rule_def_scenario["condition_source_table"].unique().tolist()
-        + rule_def_scenario["value_source_table"].unique().tolist()
-    )
-
+    unique_source_sheet = rule_def_scenario['condition_source_table'].unique().tolist() + rule_def_scenario['value_source_table'].unique().tolist()
+    
     unique_source_sheet = list(set(unique_source_sheet))  # Remove duplicates
 
     # Include any additional tables needed for threshold values from rule_group_def_scenario
-    threshold_source_tables = (
-        rule_group_def_scenario["threshold_source_table"]
-        .dropna()
-        .unique()
-        .tolist()
-    )
+    threshold_source_tables = rule_group_def_scenario['threshold_source_table'].dropna().unique().tolist()
     unique_source_sheet += threshold_source_tables
     unique_source_sheet = list(set(unique_source_sheet))
 
@@ -221,14 +232,122 @@ def read_dataframes(org_path):
             logging.warning(f"Reading sheet: {sheet}")
             sheet_data = pd.read_excel(org_path, sheet_name=sheet)
             # Prefix column names with table_name to avoid conflicts
-            sheet_data.columns = [
-                f"{sheet}_+_{col}" for col in sheet_data.columns
-            ]
+            #sheet_data.columns = [f"{sheet}_+_{col}" for col in sheet_data.columns]
+            sheet_data.columns = [f"{sheet}_+_{col}" if not col.startswith(f"{sheet}_+_") else f"{sheet}_+_{col}" for col in sheet_data.columns]
             dataframes[sheet] = sheet_data
             logging.warning(f"Sheet {sheet} read successfully.")
         except Exception as e:
             logging.warning(f"EXCEL SHEET {sheet} is MISSING: {e}")
     return dataframes
+
+
+def group_filter_data(org_path):
+    """
+    Reads required sheets from the Excel file and groups columns by table_name in a dictionary.
+    """
+    # Helper function to check if a dataset exists and is not empty
+    def dataset_exists(dataset_name):
+        if dataset_name not in globals():
+            logging.warning(f"Dataset '{dataset_name}' is not defined!")
+            return False
+        dataset = globals()[dataset_name]
+        if dataset is None or dataset.empty:
+            logging.warning(f"Dataset '{dataset_name}' is empty!")
+            return False
+        return True
+
+    # Helper function to prepare DataFrame with uniform columns
+    def prepare_dataframe(df, columns, new_column_names):
+        df_copy = df[columns].copy()
+        df_copy.columns = new_column_names
+        return df_copy
+
+    # List of datasets and their corresponding parameters for preparation
+    datasets = [
+        ("rule_def_scenario", ['condition_source_table', 'condition_column_name'], ['table_name', 'column_name'], "rule_def_scenario_copy_1"),
+        ("rule_def_scenario", ['value_source_table', 'value_source_column'], ['table_name', 'column_name'], "rule_def_scenario_copy_2"),
+        ("rule_def_scenario", ['weight_source_table', 'weight_source_column'], ['table_name', 'column_name'], "rule_def_scenario_copy_3"),
+        ("rule_group_def_scenario", ['threshold_source_table', 'threshold_filter_column'], ['table_name', 'column_name'], "rule_group_def_scenario_copy_1"),
+        ("rule_group_def_scenario", ['threshold_source_table', 'threshold_value'], ['table_name', 'column_name'], "rule_group_def_scenario_copy_2"),
+        ("rule_based_bucketing", ['condition_source_table', 'condition_column_name'], ['table_name', 'column_name'], "rule_based_bucketing_copy_1"),
+        ("reporting_bucketing_adjustment", ['condition_source_table', 'condition_column_name'], ['table_name', 'column_name'], "reporting_bucketing_adjustment_copy_1"),
+        ("reporting_bucketing_adjustment", ['value_source_table', 'value_source_column'], ['table_name', 'column_name'], "reporting_bucketing_adjustment_copy_2"),
+        ("merge_master", ['value_source_table', 'left_key'], ['table_name', 'column_name'], "merge_master_copy_1"),
+        ("merge_master", ['condition_source_table', 'right_key'], ['table_name', 'column_name'], "merge_master_copy_2"),
+        ("source_master", ['source_table_name', 'primary_key'], ['table_name', 'column_name'], "source_master_copy_1"),
+        ("source_column_list", ['source_table_name', 'source_table_column'], ['table_name', 'column_name'], "source_column_list_copy_1"),
+        ("currency_conversion_master", ['table_name', 'currency_column'], ['table_name', 'column_name'], "currency_conversion_master_copy_1"),
+        ("currency_conversion_master", ['table_name', 'date_column'], ['table_name', 'column_name'], "currency_conversion_master_copy_2"),
+        ("currency_conversion_master", ['table_name', 'entity_column'], ['table_name', 'column_name'], "currency_conversion_master_copy_3"),
+        ("limit_setup", ['column_identifier_table', 'column_identifier'], ['table_name', 'column_name'], "limit_setup_copy_1"),
+        ("limit_setup", ['column_identifier_table', 'rule_group'], ['table_name', 'column_name'], "limit_setup_copy_2"),
+    ]
+
+    prepared_dataframes = []
+
+    # Prepare DataFrames only if the dataset exists and is defined
+    for dataset_name, columns, new_column_names, var_name in datasets:
+        if dataset_exists(dataset_name):
+            try:
+                dataset = globals()[dataset_name]
+                prepared_dataframes.append(prepare_dataframe(dataset, columns, new_column_names))
+                logging.warning(f"Prepared DataFrame for '{var_name}' successfully.")
+            except Exception as e:
+                logging.warning(f"Error preparing DataFrame for '{var_name}': {e}")
+
+    # Concatenate all the prepared DataFrames
+    unique_sheet_column_combination = pd.concat(prepared_dataframes).drop_duplicates().reset_index(drop=True)
+
+    # Create dictionary: Group by 'table_name'
+    grouped_data = (
+        unique_sheet_column_combination.groupby('table_name')['column_name']
+        .apply(list)
+        .to_dict()
+    )
+    logging.warning("========== START: Processed Data Summary ==========")
+    logging.warning("Step 1: Processed unique column combinations.")
+    logging.warning(f"Processed DataFrame (first 5 rows):\n{unique_sheet_column_combination.head()}")
+
+    logging.warning("\nStep 2: Grouping by 'table_name'.")
+    for table, columns in grouped_data.items():
+        logging.warning(f"Table: {table} | Mapped Columns: {columns}")
+        logging.warning(" ")
+    logging.warning("========== END: Processed Data Summary ==========")
+
+    return grouped_data
+
+
+def filter_dataframes_by_grouped_data(dataframes, grouped_data):
+    """
+    Filters the dataframes based on the grouped columns by table_name.
+    Returns a dictionary of filtered dataframes, where the key is the table_name.
+    """
+
+    filtered_dataframes = {}
+
+    for table_name, columns in grouped_data.items():
+        # Check if the table exists in the dataframes dictionary
+        if table_name in dataframes:
+            df = dataframes[table_name]
+            # Select the columns that belong to this table_name from the dataframe
+            filtered_columns = [
+                col for col in df.columns if any(
+                    column in col or f"{table_name}_+_{column}" in col
+                    for column in columns
+                )
+            ]            
+            if filtered_columns:
+                filtered_dataframes[table_name] = df[filtered_columns]
+                #logging.warning(f"Filtered {table_name} with columns: {filtered_columns}")
+            else:
+                logging.warning(f"No matching columns found for table {table_name}.")
+            # Log the filtering process
+            logging.warning(" ")
+            #logging.warning(f"Filtered {table_name} with columns: {filtered_columns}")
+        else:
+            logging.warning(f"Table {table_name} not found in the dataframes!")
+
+    return filtered_dataframes    
 
 
 def dynamic_merge(merge_master, dataframes):
@@ -239,9 +358,7 @@ def dynamic_merge(merge_master, dataframes):
     grouped_merge_instructions = merge_master.groupby(
         ["value_source_table", "condition_source_table"]
     )
-    logging.warning(
-        f"Grouped merge instructions: {grouped_merge_instructions.groups}"
-    )
+    logging.warning(f"Grouped merge instructions: {grouped_merge_instructions.groups}")
 
     for (left_table, right_table), group in grouped_merge_instructions:
         logging.warning(f"Merging {left_table} with {right_table}")
@@ -283,9 +400,6 @@ def dynamic_merge(merge_master, dataframes):
     return merged_data
 
 
-global get_all_dataframes_dict
-global all_dataframes_dict
-
 def get_all_dataframes_dict(merge_master, merged_data, dataframes):
     """
     Combines original and merged dataframes into a single dictionary.
@@ -293,14 +407,22 @@ def get_all_dataframes_dict(merge_master, merged_data, dataframes):
     all_dataframes_dict = dataframes.copy()
     for index, row in merge_master.iterrows():
         table_name = row["value_source_table"]
-        if table_name in merged_data:
-            all_dataframes_dict[table_name] = merged_data[table_name]
-        else:
-            all_dataframes_dict[table_name] = dataframes[table_name]
+        try:
+          if table_name in merged_data:
+              
+              all_dataframes_dict[table_name] = merged_data[table_name]
+          else:
+              
+              if table_name in dataframes:
+                  logging.warning(f'This Table : {table_name} is not found. The size is {dataframes[table_name].shape}.')
+                  all_dataframes_dict[table_name] = dataframes[table_name]
+              else:
+                  logging.warning(f'This Table : {table_name} is not found. Initializing an empty DataFrame.')
+                  all_dataframes_dict[table_name] = pd.DataFrame()
+        except KeyError:
+            logging.warning(f'This Table : {table_name} is not found. Initializing an empty DataFrame.')
+            all_dataframes_dict[table_name] = pd.DataFrame()
     return all_dataframes_dict
-
-
-global conversion
 
 
 def conversion(
@@ -337,10 +459,7 @@ def conversion(
         # Build exemption mask
         exemption_rows = currency_conversion_exemption[
             (currency_conversion_exemption["value_source_table"] == table_name)
-            & (
-                currency_conversion_exemption["value_source_column"]
-                == column_name
-            )
+            & (currency_conversion_exemption["value_source_column"] == column_name)
         ]
 
         logging.warning(f" exemption_rows {exemption_rows} ")
@@ -349,9 +468,7 @@ def conversion(
             logging.warning(f" currency conversion exemption is not empty ")
             # There is an exemption, get the condition column and criteria
             for _, exemption_row in exemption_rows.iterrows():
-                exemption_condition_column = exemption_row[
-                    "exemption_condition_column"
-                ]
+                exemption_condition_column = exemption_row["exemption_condition_column"]
                 exemption_condition_criteria = exemption_row[
                     "exemption_condition_criteria"
                 ]
@@ -373,8 +490,7 @@ def conversion(
 
                 # Build exemption mask
                 exemption_mask = (
-                    df[full_exemption_condition_column]
-                    == exemption_condition_criteria
+                    df[full_exemption_condition_column] == exemption_condition_criteria
                 )
 
                 logging.warning(f"len exemption_mask {len(exemption_mask)} ")
@@ -390,16 +506,11 @@ def conversion(
             currency_conversion_rate.set_index("from_currency")["quoted_price"]
         )
         rates.fillna(1, inplace=True)
-        df.loc[currency_mask, column_name] = (
-            df.loc[currency_mask, column_name] * rates
-        )
+        df.loc[currency_mask, column_name] = df.loc[currency_mask, column_name] * rates
         dataframes[table_name] = df
 
     logging.warning(f" currency conversion fxn start ")
     return dataframes
-
-
-global evaluate_condition
 
 
 def evaluate_condition(df, condition):
@@ -418,9 +529,7 @@ def evaluate_condition(df, condition):
 
     condition_column_name = condition["condition_column_name"]
     if condition_column_name not in df.columns:
-        logging.warning(
-            f"Failed to find the target column: {condition_column_name}"
-        )
+        logging.warning(f"Failed to find the target column: {condition_column_name}")
         # Return a Series of True with the same index as df
         return pd.Series([True] * len(df), index=df.index)
 
@@ -479,42 +588,33 @@ def evaluate_condition(df, condition):
     logging.warning(
         f" final condition_value post conversion's and all : {condition_value}"
     )
+    
+    operation_type = condition['condition_type'].lower()
 
-    if condition["condition_type"] == "Contains":
-        mapping_values = mapping_set[
-            mapping_set["mapping_set"] == condition_value
-        ]["mapping_criteria"].tolist()
-        logging.warning(f"Mapping values for 'Contains': {mapping_values}")
+    if operation_type == 'contains':
+        mapping_values = mapping_set[mapping_set['mapping_set'] == condition_value]['mapping_criteria'].tolist()
+        # logging.warning(f"Mapping values for 'Contains': {mapping_values}")
         return df_column.isin(mapping_values)
-    elif condition["condition_type"] == "Does not Contain":
-        mapping_values = mapping_set[
-            mapping_set["mapping_set"] == condition_value
-        ]["mapping_criteria"].tolist()
-        logging.warning(
-            f"Mapping values for 'Does not Contain': {mapping_values}"
-        )
+    elif operation_type == 'noes not contain':
+        mapping_values = mapping_set[mapping_set['mapping_set'] == condition_value]['mapping_criteria'].tolist()
+        # logging.warning(f"Mapping values for 'Does not Contain': {mapping_values}")
         return ~df_column.isin(mapping_values)
-    elif condition["condition_type"] == "Equal to":
+    elif operation_type == 'equal to':
         return df_column == value
-    elif condition["condition_type"] == "Not Equals":
+    elif operation_type == 'not equals':
         return df_column != value
-    elif condition["condition_type"] == "Greater Than":
+    elif operation_type == 'greater than':
         return df_column > value
-    elif condition["condition_type"] == "Smaller Than":
+    elif operation_type == 'smaller than':
         return df_column < value
-    elif condition["condition_type"] == "Greater Than Equal to":
+    elif operation_type == 'greater than equal to':
         return df_column >= value
-    elif condition["condition_type"] == "Smaller Than Equal to":
+    elif operation_type == 'smaller than equal to':
         return df_column <= value
     else:
-        logging.warning(
-            f"Unknown condition type: {condition['condition_type']}"
-        )
+        logging.warning(f"Unknown condition type: -{operation_type}-")
         # Return a Series of True with the same index as df
         return pd.Series([True] * len(df), index=df.index)
-
-
-global filter_dataframes_by_currency
 
 
 def filter_dataframes_by_currency(
@@ -534,9 +634,6 @@ def filter_dataframes_by_currency(
     return dataframes
 
 
-global combine_bucketed_values
-
-
 def combine_bucketed_values(dict1, dict2, operation, operation_parameter=None):
     """
     Combines two bucketed values dictionaries based on the specified operation.
@@ -546,12 +643,10 @@ def combine_bucketed_values(dict1, dict2, operation, operation_parameter=None):
     combined = {}
     if operation == "CUMULATIVE_SUM":
         # Use the mapping set to get the bucket order
-        mapping_values = mapping_set[
-            mapping_set["mapping_set"] == operation_parameter
-        ]["mapping_criteria"].tolist()
-        logging.warning(
-            f"Operation parameter (mapping set): {operation_parameter}"
-        )
+        mapping_values = mapping_set[mapping_set["mapping_set"] == operation_parameter][
+            "mapping_criteria"
+        ].tolist()
+        logging.warning(f"Operation parameter (mapping set): {operation_parameter}")
         logging.warning(f"Mapping values (bucket order): {mapping_values}")
 
         # Merge dict1 and dict2
@@ -616,12 +711,8 @@ def combine_bucketed_values(dict1, dict2, operation, operation_parameter=None):
                 if value2 != 0:
                     combined[bucket_id] = value1 / value2
                 else:
-                    logging.warning(
-                        f"Division by zero for bucket_id {bucket_id}"
-                    )
-                    combined[bucket_id] = (
-                        None  # Or set to zero or appropriate value
-                    )
+                    logging.warning(f"Division by zero for bucket_id {bucket_id}")
+                    combined[bucket_id] = None  # Or set to zero or appropriate value
             else:
                 logging.warning(f"Unknown operation: {operation}")
                 combined[bucket_id] = None
@@ -631,9 +722,6 @@ def combine_bucketed_values(dict1, dict2, operation, operation_parameter=None):
 
 
 # Group the scenarios by 'currency_scenario_id' and aggregate the 'currency_list' into a list
-global drill_down_report_flag
-global reporting_date
-global reporting_currency
 grouped_scenarios = (
     currency_scenario_config.groupby(
         [
@@ -675,19 +763,11 @@ for idx, scenario in grouped_scenarios.iterrows():
 
     # Prepare output file paths
     file_path_rule = file_path_rule_template.format(scenario_analysis_id)
-    file_path_rule_grp = file_path_rule_grp_template.format(
-        scenario_analysis_id
-    )
+    file_path_rule_grp = file_path_rule_grp_template.format(scenario_analysis_id)
     file_path_ans = file_path_ans_template.format(scenario_analysis_id)
-    drill_down_file_path = (
-        rf"{location}\drill_down_report_{scenario_analysis_id}.xlsx"
-    )
+    drill_down_file_path = rf"{location}\drill_down_report_{scenario_analysis_id}.xlsx"
 
     # Initialize DataFrames for this scenario
-    global rule_group_def_scenario
-    global rule_def_scenario
-    global report_format_scenario
-    global currency_conversion_master_scenario
     rule_group_def_scenario = rule_group_def.copy()
     rule_def_scenario = rule_def.copy()
     report_format_scenario = report_format.copy()
@@ -725,6 +805,8 @@ for idx, scenario in grouped_scenarios.iterrows():
 
     # Read DataFrames from Excel
     dataframes = read_dataframes(org_path)
+    grouped_data = group_filter_data(org_path)
+    dataframes = filter_dataframes_by_grouped_data(dataframes, grouped_data)
 
     # Filter dataframes based on currency_list
     dataframes = filter_dataframes_by_currency(
@@ -747,25 +829,20 @@ for idx, scenario in grouped_scenarios.iterrows():
     merged_data = dynamic_merge(merge_master, dataframes)
 
     # Get all dataframes
-    all_dataframes_dict = get_all_dataframes_dict(
-        merge_master, merged_data, dataframes
-    )
+    all_dataframes_dict = get_all_dataframes_dict(merge_master, merged_data, dataframes)
 
     # Re-initialize drill_down_data and bucketed_values_dict
-    global bucketed_values_dict
-    global drill_down_data
-    global col_name
     drill_down_data = []
     bucketed_values_dict = {}  # Stores bucketed values for each label_id
 
     # Create mapping from rule_group to bucketing_applicability
-    logging.warning(
-        "Creating mapping from rule_group to bucketing_applicability..."
-    )
-    global rule_group_to_bucketing_applicability
+    logging.warning("Creating mapping from rule_group to bucketing_applicability...")
+    
     rule_group_to_bucketing_applicability = {}
     for col_name in calculated_columns:
-        bucketing_applicability = column_type[column_type['column_name'] == col_name]['bucketing_applicability'].values[0]
+        bucketing_applicability = column_type[column_type["column_name"] == col_name][
+            "bucketing_applicability"
+        ].values[0]
         for index, row in report_format_scenario.iterrows():
             rule_group = row[col_name]
             if pd.notna(rule_group):
@@ -781,20 +858,22 @@ for idx, scenario in grouped_scenarios.iterrows():
                     rule_group_to_bucketing_applicability[rule_group] = (
                         bucketing_applicability
                     )
-    logging.warning(
-        "Mapping from rule_group to bucketing_applicability created."
-    )
-    global label_id_column_to_bucketing_applicability
+    logging.warning("Mapping from rule_group to bucketing_applicability created.")
+    
     label_id_column_to_bucketing_applicability = {}
     for index, row in report_format_scenario.iterrows():
-        label_id = row['label_id']
+        label_id = row["label_id"]
         for col_name in calculated_columns:
             rule_group = row[col_name]
             if pd.notna(rule_group):
-                bucketing_applicability = column_type[column_type['column_name'] == col_name]['bucketing_applicability'].values[0]
-                label_id_column_to_bucketing_applicability[(label_id, col_name)] = bucketing_applicability
-              
-    global rule_group_to_label_ids
+                bucketing_applicability = column_type[
+                    column_type["column_name"] == col_name
+                ]["bucketing_applicability"].values[0]
+                label_id_column_to_bucketing_applicability[(label_id, col_name)] = (
+                    bucketing_applicability
+                )
+
+    
     # Create mapping from rule_group to label_ids
     logging.warning("Creating mapping from rule_group to label_ids...")
     rule_group_to_label_ids = {}
@@ -836,7 +915,6 @@ for idx, scenario in grouped_scenarios.iterrows():
     # label_id_df_transposed.to_csv('label_id_to_bucketing_applicability_pd.csv', index=False)
 
     # Define functions that use scenario-specific variables
-    global evaluate_rule_set
 
     # Define functions that use scenario-specific variables
     def evaluate_rule_set(rule_set, rule_group):
@@ -844,10 +922,12 @@ for idx, scenario in grouped_scenarios.iterrows():
         Evaluates a rule set and returns bucketed values and final value.
         """
         logging.warning(f"Evaluating rule set: {rule_set}")
-        bucketing_applicability = rule_group_to_bucketing_applicability.get(rule_group, 'Yes')
+        bucketing_applicability = rule_group_to_bucketing_applicability.get(
+            rule_group, "Yes"
+        )
         if bucketing_flag_global == "No":
             bucketing_applicability = "No"
-          
+
         conditions = rule_def_scenario[
             rule_def_scenario["condition_rule_set"] == rule_set
         ]
@@ -883,9 +963,7 @@ for idx, scenario in grouped_scenarios.iterrows():
             logging.warning("Filtering based on condition")
             df = df.reset_index(drop=True)
 
-            logging.warning(
-                f"before condition lenght of resultant df {len(df)}"
-            )
+            logging.warning(f"before condition lenght of resultant df {len(df)}")
             condition_result = condition_result.reset_index(drop=True)
             df = df[condition_result]
 
@@ -919,9 +997,7 @@ for idx, scenario in grouped_scenarios.iterrows():
             operation_to_perform == "weighted average"
             or operation_to_perform == "sum product"
         ):
-            logging.warning(
-                "Performing weighted average or sum product  calculation"
-            )
+            logging.warning("Performing weighted average or sum product  calculation")
             # Get the necessary columns from the last condition
             value_source_table = conditions["value_source_table"].iloc[-1]
             value_source_column = conditions["value_source_column"].iloc[-1]
@@ -930,9 +1006,7 @@ for idx, scenario in grouped_scenarios.iterrows():
 
             # Check if weight_source_table is in all_dataframes_dict
             if weight_source_table not in all_dataframes_dict:
-                logging.warning(
-                    f"Missing weight source table: {weight_source_table}"
-                )
+                logging.warning(f"Missing weight source table: {weight_source_table}")
                 return {}, 0
 
             weight_df = all_dataframes_dict[weight_source_table]
@@ -940,10 +1014,7 @@ for idx, scenario in grouped_scenarios.iterrows():
             # Get merge keys from merge_master
             merge_instructions = merge_master[
                 (merge_master["value_source_table"] == value_source_table)
-                & (
-                    merge_master["condition_source_table"]
-                    == weight_source_table
-                )
+                & (merge_master["condition_source_table"] == weight_source_table)
             ]
 
             logging.warning(
@@ -951,9 +1022,7 @@ for idx, scenario in grouped_scenarios.iterrows():
             )
 
             value_column_full = value_source_column
-            weight_column_full = (
-                weight_source_table + "_+_" + weight_source_column
-            )
+            weight_column_full = weight_source_table + "_+_" + weight_source_column
 
             logging.warning(f"  ")
             logging.warning(f"value_column_full {value_column_full}")
@@ -1011,47 +1080,45 @@ for idx, scenario in grouped_scenarios.iterrows():
                 return {}, 0
 
             # Calculate weighted average
+            logging.warning(f"Columns: {list(df.columns)}")
+            logging.warning(f"Length of df: {len(df)}")
+ 
+            # Check dtypes
+            logging.warning(f"Dtypes:\n{df.dtypes}")
+            logging.warning(f"Dtypes:\n{df.shape}")
+ 
+            # Convert to float if necessary
+            df[value_column_full] = df[value_column_full].astype(float)
+            df[weight_column_full] = df[weight_column_full].astype(float)
+ 
             try:
-                logging.warning(f"  inside try catch block  ")
+                start = time.time()
                 a = df[value_column_full].sum()
-                logging.warning(f"  a {a}   ")
+                logging.warning(f"Summation '{value_column_full}' took {time.time()-start:.2f}s; result={a}")
+ 
+                start = time.time()
                 b = df[weight_column_full].sum()
-                logging.warning(f"  b {b}   ")
-
-                weighted_sum = (
-                    df[value_column_full] * df[weight_column_full]
-                ).sum()
-                logging.warning(
-                    f"  sum product is  num a {df[value_column_full].sum()}   "
-                )
-                total_weight = df[weight_column_full].sum()
-                logging.warning(f"  weighted_sumis{weighted_sum}   ")
-                logging.warning(f"   total_weightis{total_weight}  ")
-
-                # df.to_csv("target_dataframe_after.csv", index = False )
-                logging.warning(f"  line 603 target mentioned ")
-
-                if (
-                    operation_to_perform == "weighted average"
-                    and total_weight != 0
-                ):
+                logging.warning(f"Summation '{weight_column_full}' took {time.time()-start:.2f}s; result={b}")
+ 
+                start = time.time()
+                weighted_sum = (df[value_column_full] * df[weight_column_full]).sum()
+                logging.warning(f"Weighted_sum took {time.time()-start:.2f}s; result={weighted_sum}")
+ 
+                total_weight = b  # or df[weight_column_full].sum() again, but we already have b
+                logging.warning(f"total_weight = {total_weight}")
+ 
+                if operation_to_perform == 'weighted average' and total_weight != 0:
                     final_value = weighted_sum / total_weight
-                    logging.warning(
-                        f" weighted average  final_value {final_value} "
-                    )
-                elif operation_to_perform == "sum product":
+                    logging.warning(f"weighted average final_value {final_value}")
+                elif operation_to_perform == 'sum product':
                     final_value = weighted_sum
-                    logging.warning(f" sum porduct final_value {final_value} ")
+                    logging.warning(f"sum product final_value {final_value}")
                 else:
-                    logging.warning(
-                        "Total weight is zero, cannot compute weighted average."
-                    )
+                    logging.warning("Total weight is zero or unknown operation.")
                     final_value = 0
-
+ 
             except Exception as e:
-                logging.warning(
-                    f"Error during weighted average / sum porduct calculation: {e}"
-                )
+                logging.warning(f"Error during calculation: {e}")
                 final_value = 0
 
         else:
@@ -1063,7 +1130,6 @@ for idx, scenario in grouped_scenarios.iterrows():
         logging.warning(f"Final value for {rule_set} is {final_value}")
 
         # Apply bucketing if applicable
-        global bucketed_values
         bucketed_values = {}  # Dictionary to hold bucketed values
 
         logging.warning(
@@ -1075,9 +1141,7 @@ for idx, scenario in grouped_scenarios.iterrows():
                 bucket_rule_mapping["reporting_rule_id"] == rule_set
             ]
             if not bucketing_rule_row.empty:
-                bucketing_rule_set = bucketing_rule_row[
-                    "bucketing_rule"
-                ].values[0]
+                bucketing_rule_set = bucketing_rule_row["bucketing_rule"].values[0]
                 adjustment_rule = bucketing_rule_row.get(
                     "adjustment_rule", np.nan
                 ).values[0]
@@ -1086,9 +1150,9 @@ for idx, scenario in grouped_scenarios.iterrows():
                     bucketing_type["bucketing_rule_set"] == bucketing_rule_set
                 ]
                 if not bucketing_type_row.empty:
-                    bucketing_type_value = bucketing_type_row[
-                        "bucketing_type"
-                    ].values[0]
+                    bucketing_type_value = bucketing_type_row["bucketing_type"].values[
+                        0
+                    ]
                     if bucketing_type_value == "rule_based_bucketing":
                         # Apply rule-based bucketing
                         bucketed_values = apply_rule_based_bucketing(
@@ -1104,9 +1168,7 @@ for idx, scenario in grouped_scenarios.iterrows():
                         )
                     elif bucketing_type_value == "reporting_pattern_bucketing":
                         # Apply reporting pattern bucketing
-                        bucketed_values = apply_reporting_pattern_bucketing(
-                            rule_set
-                        )
+                        bucketed_values = apply_reporting_pattern_bucketing(rule_set)
                     else:
                         logging.warning(
                             f"Unknown bucketing type: {bucketing_type_value}"
@@ -1149,12 +1211,10 @@ for idx, scenario in grouped_scenarios.iterrows():
         logging.warning(
             f"Returning evaluate_rule_set with bucketed_values {bucketed_values}"
         )
-        logging.warning(
-            f"Returning evaluate_rule_set with final_value {final_value}"
-        )
+        logging.warning(f"Returning evaluate_rule_set with final_value {final_value}")
         return bucketed_values, final_value
 
-    global collect_drill_down_data
+    
 
     def collect_drill_down_data(
         df, rule_set, rule_group, value_source_column, bucketed_values
@@ -1177,9 +1237,7 @@ for idx, scenario in grouped_scenarios.iterrows():
             if not unique_identifier_col_series.empty:
                 unique_identifier_col = unique_identifier_col_series.values[0]
                 drill_down_df = df.copy()
-                drill_down_df["unique_identifier"] = df[
-                    unique_identifier_col
-                ].values
+                drill_down_df["unique_identifier"] = df[unique_identifier_col].values
                 drill_down_df["currency_column"] = currency_col_name
                 drill_down_df["base_currency"] = df[currency_col_name].values
                 drill_down_df["Amount_column"] = value_source_column
@@ -1203,19 +1261,28 @@ for idx, scenario in grouped_scenarios.iterrows():
         else:
             logging.warning(f"No currency_column found for table {sheet_name}")
 
-    global apply_rule_based_bucketing
-    def apply_rule_based_bucketing(df, bucketing_rule_set, value_source_column, adjustment_rule=None):
+    
+
+    def apply_rule_based_bucketing(
+        df, bucketing_rule_set, value_source_column, adjustment_rule=None
+    ):
         """
         Applies rule-based bucketing to the DataFrame and returns bucketed values.
         """
-        logging.warning(f"Applying rule-based bucketing for bucketing_rule_set: {bucketing_rule_set}")
-        bucketing_conditions = rule_based_bucketing[rule_based_bucketing['bucketing_rule_set'] == bucketing_rule_set]
+        logging.warning(
+            f"Applying rule-based bucketing for bucketing_rule_set: {bucketing_rule_set}"
+        )
+        bucketing_conditions = rule_based_bucketing[
+            rule_based_bucketing["bucketing_rule_set"] == bucketing_rule_set
+        ]
         bucketed_data = []
-        
-        for bucket_id in bucketing_conditions['bucket_id'].unique():
-            bucket_conditions = bucketing_conditions[bucketing_conditions['bucket_id'] == bucket_id]
+
+        for bucket_id in bucketing_conditions["bucket_id"].unique():
+            bucket_conditions = bucketing_conditions[
+                bucketing_conditions["bucket_id"] == bucket_id
+            ]
             temp_df = df.copy()
-        
+
             # Apply conditions for each bucket
             for idx, condition in bucket_conditions.iterrows():
                 logging.warning(f"  ")
@@ -1223,15 +1290,16 @@ for idx, scenario in grouped_scenarios.iterrows():
                 if 'tenor' in condition and 'tenor_unit' in condition:
                     if pd.notnull(condition['tenor']) and pd.notnull(condition['tenor_unit']):
                         tenor_unit = condition['tenor_unit'].lower()  # Normalize to lowercase
+                        tenor_value = int(condition['tenor'])
                 
                         if tenor_unit == 'd':  # Days
-                            new_date = reporting_date + pd.Timedelta(days=condition['tenor'])
+                            new_date = reporting_date + pd.Timedelta(days=tenor_value)
                         elif tenor_unit == 'm':  # Months
-                            new_date = reporting_date + relativedelta(months=condition['tenor'])
+                            new_date = reporting_date + relativedelta(months=tenor_value)
                         elif tenor_unit == 'q':  # Quarters
-                            new_date = reporting_date + relativedelta(months=condition['tenor'] * 3)
+                            new_date = reporting_date + relativedelta(months=tenor_value * 3)
                         elif tenor_unit == 'y':  # Years
-                            new_date = reporting_date + relativedelta(years=condition['tenor'])
+                            new_date = reporting_date + relativedelta(years=tenor_value)
                         else:
                             new_date = None
                             calculated_time_to_maturity = None
@@ -1256,52 +1324,67 @@ for idx, scenario in grouped_scenarios.iterrows():
                         logging.warning("Tenor or tenor_unit is null.")
                 else:
                     logging.warning("Tenor or tenor_unit is missing from condition.")
-                
-                
-                logging.warning(f" apply rule based bucketing before filter lenght {len(temp_df)}")
+
+                logging.warning(
+                    f" apply rule based bucketing before filter lenght {len(temp_df)}"
+                )
                 # logging.warning(f" print temp_df {temp_df}")
                 condition_result = evaluate_condition(temp_df, condition)
                 temp_df = temp_df[condition_result]
+
+                logging.warning(
+                    f" apply rule based bucketing  after filter lenght {len(temp_df)}"
+                )
                 
-                logging.warning(f" apply rule based bucketing  after filter lenght {len(temp_df)}")
-                logging.warning(f"  temp_df {temp_df}")
-                
+
                 if temp_df.empty:
                     break
-    
+
             if not temp_df.empty:
                 # Tag the data with bucket_id for drill-down report
-                temp_df['bucket_id'] = bucket_id
+                temp_df["bucket_id"] = bucket_id
                 bucketed_data.append(temp_df)
-        
+
         logging.warning(f" bucketed_data: {bucketed_data}")
         if bucketed_data:
             # Combine all bucketed data
             df_bucketed = pd.concat(bucketed_data, ignore_index=True)
         else:
             # If no bucketed data, create an empty df_bucketed
-            df_bucketed = pd.DataFrame(columns=df.columns.tolist() + ['bucket_id'])
-        
+            df_bucketed = pd.DataFrame(columns=df.columns.tolist() + ["bucket_id"])
+
         # Apply adjustments if adjustment_rule is provided
         if pd.notna(adjustment_rule):
-            logging.warning(f"Applying adjustments using adjustment_rule: {adjustment_rule}")
-            adjusted_bucketed_values, adjusted_df = apply_bucket_adjustments(df_bucketed, value_source_column, adjustment_rule)
+            logging.warning(
+                f"Applying adjustments using adjustment_rule: {adjustment_rule}"
+            )
+            adjusted_bucketed_values, adjusted_df = apply_bucket_adjustments(
+                df_bucketed, value_source_column, adjustment_rule
+            )
             # Logging the bucketed values after adjustment
-            logging.warning(f"Bucketed values after adjustment: {adjusted_bucketed_values}")
+            logging.warning(
+                f"Bucketed values after adjustment: {adjusted_bucketed_values}"
+            )
             # Update df_bucketed with adjusted_df
             df_bucketed = adjusted_df
         else:
             logging.warning("No adjustment rule provided.")
             # Calculate bucketed_values from df_bucketed
-            adjusted_bucketed_values = df_bucketed.groupby('bucket_id')[value_source_column].sum().to_dict()
-        
+            adjusted_bucketed_values = (
+                df_bucketed.groupby("bucket_id")[value_source_column].sum().to_dict()
+            )
+
         # Logging the final bucketed values
         logging.warning(f"Final bucketed values: {adjusted_bucketed_values}")
-        
+
         # Return adjusted_bucketed_values
         return adjusted_bucketed_values
-    
+
     global apply_bucket_adjustments
+    global apply_static_pattern_bucketing
+    global apply_reporting_pattern_bucketing
+    global evaluate_rule_group
+
     def apply_bucket_adjustments(df, value_source_column, adjustment_rule):
         """
         Applies adjustments to the bucketed values based on the adjustment_rule.
@@ -1310,16 +1393,13 @@ for idx, scenario in grouped_scenarios.iterrows():
             f"Applying bucket adjustments for adjustment_rule: {adjustment_rule}"
         )
         adjustments = reporting_bucketing_adjustment[
-            reporting_bucketing_adjustment["bucketing_rule_id"]
-            == adjustment_rule
+            reporting_bucketing_adjustment["bucketing_rule_id"] == adjustment_rule
         ]
         adjusted_df = df.copy()
 
         # Log initial bucketed values
         initial_bucketed_values = (
-            adjusted_df.groupby("bucket_id")[value_source_column]
-            .sum()
-            .to_dict()
+            adjusted_df.groupby("bucket_id")[value_source_column].sum().to_dict()
         )
         logging.warning(f"Initial bucketed values: {initial_bucketed_values}")
 
@@ -1333,9 +1413,7 @@ for idx, scenario in grouped_scenarios.iterrows():
                 continue
 
             impact_value = row["impact_value"]
-            condition_operation = (
-                row.get("condition_operation", "And").strip().lower()
-            )
+            condition_operation = row.get("condition_operation", "And").strip().lower()
 
             logging.warning(
                 f"Processing adjustment {idx}: from_bucket {from_bucket} to_bucket {to_bucket}"
@@ -1354,9 +1432,7 @@ for idx, scenario in grouped_scenarios.iterrows():
             condition_column_full = f"{condition['condition_source_table']}_+_{condition['condition_column_name']}"
             condition["condition_column_name"] = condition_column_full
 
-            logging.warning(
-                f"Condition column full name: {condition_column_full}"
-            )
+            logging.warning(f"Condition column full name: {condition_column_full}")
 
             # Check if the column exists
             if condition_column_full not in adjusted_df.columns:
@@ -1394,9 +1470,7 @@ for idx, scenario in grouped_scenarios.iterrows():
             adjustment_indices = df_condition_met.index
 
             # Calculate amount to move
-            initial_values = adjusted_df.loc[
-                adjustment_indices, value_source_column
-            ]
+            initial_values = adjusted_df.loc[adjustment_indices, value_source_column]
             amount_to_move = initial_values * impact_value
 
             logging.warning(
@@ -1414,16 +1488,12 @@ for idx, scenario in grouped_scenarios.iterrows():
                 continue
 
             # Subtract amount from from_bucket
-            adjusted_df.loc[
-                adjustment_indices, value_source_column
-            ] -= amount_to_move
+            adjusted_df.loc[adjustment_indices, value_source_column] -= amount_to_move
 
             # Ensure no negative values after subtraction
-            adjusted_df.loc[adjustment_indices, value_source_column] = (
-                adjusted_df.loc[adjustment_indices, value_source_column].clip(
-                    lower=0
-                )
-            )
+            adjusted_df.loc[adjustment_indices, value_source_column] = adjusted_df.loc[
+                adjustment_indices, value_source_column
+            ].clip(lower=0)
 
             logging.warning(
                 f"After subtraction, total in from_bucket {from_bucket}: {adjusted_df.loc[from_bucket_mask, value_source_column].sum()}"
@@ -1435,9 +1505,7 @@ for idx, scenario in grouped_scenarios.iterrows():
                 moved_rows = adjusted_df.loc[adjustment_indices].copy()
                 moved_rows["bucket_id"] = to_bucket
                 moved_rows[value_source_column] = amount_to_move
-                adjusted_df = pd.concat(
-                    [adjusted_df, moved_rows], ignore_index=True
-                )
+                adjusted_df = pd.concat([adjusted_df, moved_rows], ignore_index=True)
 
                 logging.warning(
                     f"Moved {amount_to_move.sum()} from bucket {from_bucket} to bucket {to_bucket}"
@@ -1455,9 +1523,7 @@ for idx, scenario in grouped_scenarios.iterrows():
 
         # Recalculate bucketed_values from adjusted_df
         adjusted_bucketed_values = (
-            adjusted_df.groupby("bucket_id")[value_source_column]
-            .sum()
-            .to_dict()
+            adjusted_df.groupby("bucket_id")[value_source_column].sum().to_dict()
         )
 
         logging.warning(
@@ -1465,7 +1531,7 @@ for idx, scenario in grouped_scenarios.iterrows():
         )
         return adjusted_bucketed_values, adjusted_df
 
-    global apply_static_pattern_bucketing
+    
 
     def apply_static_pattern_bucketing(final_value, bucketing_rule_set):
         """
@@ -1486,7 +1552,7 @@ for idx, scenario in grouped_scenarios.iterrows():
 
         return bucketed_values
 
-    global apply_reporting_pattern_bucketing
+    
 
     def apply_reporting_pattern_bucketing(rule_set):
         """
@@ -1511,13 +1577,11 @@ for idx, scenario in grouped_scenarios.iterrows():
                     f"No bucketed values found to inherit from rule_id: {inherit_rule_id}"
                 )
         else:
-            logging.warning(
-                f"No reporting pattern found for rule_set: {rule_set}"
-            )
+            logging.warning(f"No reporting pattern found for rule_set: {rule_set}")
 
         return bucketed_values
 
-    global evaluate_rule_group
+    
 
     def evaluate_rule_group(rule_group):
         """
@@ -1525,7 +1589,7 @@ for idx, scenario in grouped_scenarios.iterrows():
         """
         logging.warning(f"Evaluating rule group: {rule_group}")
         bucketing_applicability = rule_group_to_bucketing_applicability.get(
-            rule_group, "No"
+            rule_group, "Yes"
         )
         logging.warning(
             f"Evaluating rule group: {rule_group} and bucketing_applicability: {bucketing_applicability}"
@@ -1549,28 +1613,22 @@ for idx, scenario in grouped_scenarios.iterrows():
                     value = rule_group_def_scenario.loc[
                         group_def_indices, bucket_id
                     ].values[0]
-                    stored_bucketed_values[bucket_id] = (
-                        value if pd.notna(value) else 0
-                    )
+                    stored_bucketed_values[bucket_id] = value if pd.notna(value) else 0
             else:
                 # If bucketing is not applicable, get the 'Unbucketed' value
                 value = rule_group_def_scenario.loc[
                     group_def_indices, "Unbucketed"
                 ].values[0]
-                stored_bucketed_values["Unbucketed"] = (
-                    value if pd.notna(value) else 0
-                )
+                stored_bucketed_values["Unbucketed"] = value if pd.notna(value) else 0
             return stored_bucketed_values, group_def["final_value"].iloc[0]
 
         combined_bucketed_values = {}
-        combined_final_value = (
-            None  # Start with None for operations like MULTIPLY
-        )
+        combined_final_value = None  # Start with None for operations like MULTIPLY
 
         # For operations involving two operands, we need to handle them differently
-        if len(group_def) == 1 and group_def["rule_group_operation"].iloc[
-            0
-        ] in ["MULTIPLY"]:
+        if len(group_def) == 1 and group_def["rule_group_operation"].iloc[0] in [
+            "MULTIPLY"
+        ]:
             operation = group_def["rule_group_operation"].iloc[0]
             sub_rule_group_1 = group_def["sub_rule_group"].iloc[0]
             sub_rule_group_2 = group_def["operation_parameter"].iloc[0]
@@ -1617,9 +1675,7 @@ for idx, scenario in grouped_scenarios.iterrows():
                     )
                 elif pd.notna(row["sub_rule_group"]):
                     # Recursively evaluate the sub-rule group and get its bucketed values and final value
-                    bucketed_values, value = evaluate_rule_group(
-                        row["sub_rule_group"]
-                    )
+                    bucketed_values, value = evaluate_rule_group(row["sub_rule_group"])
                 else:
                     logging.warning("No rule_set or sub_rule_group specified.")
                     bucketed_values, value = {}, 0
@@ -1666,9 +1722,7 @@ for idx, scenario in grouped_scenarios.iterrows():
                     )
                     combined_final_value = range_sum_value
                     # For RANGE_SUM, we can set combined_bucketed_values to the summed value
-                    combined_bucketed_values = {
-                        "Unbucketed": combined_final_value
-                    }
+                    combined_bucketed_values = {"Unbucketed": combined_final_value}
                     logging.warning(
                         f"Inside RANGE_SUM range_sum_value {range_sum_value}"
                     )
@@ -1694,16 +1748,12 @@ for idx, scenario in grouped_scenarios.iterrows():
                         if combined_final_value is None:
                             combined_final_value = value
                         else:
-                            combined_final_value = max(
-                                combined_final_value, value
-                            )
+                            combined_final_value = max(combined_final_value, value)
                     elif operation == "MIN":
                         if combined_final_value is None:
                             combined_final_value = value
                         else:
-                            combined_final_value = min(
-                                combined_final_value, value
-                            )
+                            combined_final_value = min(combined_final_value, value)
                     elif operation == "ABS":
                         if combined_final_value is None:
                             combined_final_value = abs(value)
@@ -1716,9 +1766,7 @@ for idx, scenario in grouped_scenarios.iterrows():
                             else:
                                 combined_final_value /= value
                         else:
-                            logging.warning(
-                                "Division by zero or None encountered."
-                            )
+                            logging.warning("Division by zero or None encountered.")
                     elif operation == "CUMULATIVE_SUM":
                         logging.warning("Inside CUMULATIVE_SUM")
                         operation_parameter = row["operation_parameter"]
@@ -1728,9 +1776,9 @@ for idx, scenario in grouped_scenarios.iterrows():
                         if bucketing_applicability == "Yes":
                             bucketed_values = combined_bucketed_values
                             if bucketed_values:
-                                combined_final_value = list(
-                                    bucketed_values.values()
-                                )[-1]
+                                combined_final_value = list(bucketed_values.values())[
+                                    -1
+                                ]
                             else:
                                 combined_final_value = 0
                         else:
@@ -1760,9 +1808,7 @@ for idx, scenario in grouped_scenarios.iterrows():
                 false_value = limit_row["false_value"]
                 column_name_breach = limit_row["column_identifier"]
                 # Use 'breach_test' as the column name
-                breach_column_name = (
-                    column_name_breach + "_" + "breach_identifier"
-                )
+                breach_column_name = column_name_breach + "_" + "breach_identifier"
                 # Value to check is combined_final_value
                 value_to_check = combined_final_value
                 # Perform limit check with detailed logging.warning statements
@@ -1770,9 +1816,7 @@ for idx, scenario in grouped_scenarios.iterrows():
                     f"Checking limit condition for rule_group: {rule_group}"
                 )
                 logging.warning(f"Value to check: {value_to_check}")
-                logging.warning(
-                    f"Limit condition: {limit_condition} {limit_value}"
-                )
+                logging.warning(f"Limit condition: {limit_condition} {limit_value}")
                 breach_result = false_value  # Default to false_value
                 if limit_condition == "Greater than":
                     if value_to_check > limit_value:
@@ -1784,16 +1828,14 @@ for idx, scenario in grouped_scenarios.iterrows():
                     if value_to_check == limit_value:
                         breach_result = true_value
                 else:
-                    logging.warning(
-                        f"Unknown limit_condition: {limit_condition}"
-                    )
+                    logging.warning(f"Unknown limit_condition: {limit_condition}")
                     logging.warning(
                         f"Breach result for rule_group {rule_group}: {breach_result}"
                     )
                 # Store the breach result in rule_group_def_scenario
-                rule_group_def_scenario.loc[
-                    group_def.index, breach_column_name
-                ] = breach_result
+                rule_group_def_scenario.loc[group_def.index, breach_column_name] = (
+                    breach_result
+                )
                 # Also store in report_format_scenario
                 # For all calculated columns
                 for col in calculated_columns:
@@ -1803,9 +1845,7 @@ for idx, scenario in grouped_scenarios.iterrows():
                             breach_column_name,
                         ] = breach_result
         else:
-            logging.warning(
-                f"No limit checks defined for rule_group: {rule_group}"
-            )
+            logging.warning(f"No limit checks defined for rule_group: {rule_group}")
 
         # Apply threshold criteria if any
         threshold_criteria = group_def.iloc[0]["threshold_criteria"]
@@ -1813,10 +1853,14 @@ for idx, scenario in grouped_scenarios.iterrows():
         threshold_source_table = group_def.iloc[0]["threshold_source_table"]
         threshold_filter_column = group_def.iloc[0]["threshold_filter_column"]
         threshold_filter_value = group_def.iloc[0]["threshold_filter_value"]
-
-        logging.warning(
-            f"Applying threshold criteria: {threshold_criteria} with threshold value: {threshold_value}"
-        )
+        
+        logging.warning(f"Applying threshold criteria: {threshold_criteria} with threshold value: {threshold_value}")
+        try:
+            threshold_value = float(threshold_value)
+            logging.warning(f" converted values to flaot  {threshold_value}")
+        except (ValueError, TypeError):
+            logging.warning(f" passing as thrsohold is string cant be converted {threshold_value}")
+            pass
 
         # Fetch dynamic threshold value if necessary
         if (
@@ -1954,9 +1998,7 @@ for idx, scenario in grouped_scenarios.iterrows():
         if bucketing_applicability == "Yes":
             for bucket_id in bucket_ids:
                 value = combined_bucketed_values.get(bucket_id, 0)
-                rule_group_def_scenario.loc[group_def_indices, bucket_id] = (
-                    value
-                )
+                rule_group_def_scenario.loc[group_def_indices, bucket_id] = value
         else:
             ######## If bucketing is not applicable, store 'Unbucketed' value
             rule_group_def_scenario.loc[group_def_indices, "Unbucketed"] = (
@@ -1990,10 +2032,11 @@ for idx, scenario in grouped_scenarios.iterrows():
     final_report_format = report_format_scenario.copy()
 
     # Sort report_format_scenario based on 'execution_order'
-    report_format_scenario["execution_order"].fillna(np.inf, inplace=True)
-    report_format_scenario.sort_values(
-        "execution_order", ascending=True, inplace=True
-    )
+    report_format_scenario["execution_order"].fillna(100000000, inplace=True)
+    report_format_scenario["execution_order"] = report_format_scenario[
+        "execution_order"
+    ].astype(int)
+    report_format_scenario.sort_values("execution_order", ascending=True, inplace=True)
 
     # Evaluate calculated columns based on 'column_type' sheet
     col_name_indexer = 0
@@ -2008,9 +2051,9 @@ for idx, scenario in grouped_scenarios.iterrows():
             pass
 
         logging.warning(f"Calculating column: {col_name}")
-        bucketing_applicability = column_type[
-            column_type["column_name"] == col_name
-        ]["bucketing_applicability"].values[0]
+        bucketing_applicability = column_type[column_type["column_name"] == col_name][
+            "bucketing_applicability"
+        ].values[0]
 
         loop_indexer = 0
 
@@ -2039,15 +2082,11 @@ for idx, scenario in grouped_scenarios.iterrows():
 
     # Collect all columns that have 'breach_identifier' in their name
     breach_columns = [
-        col
-        for col in report_format_scenario.columns
-        if "breach_identifier" in col
+        col for col in report_format_scenario.columns if "breach_identifier" in col
     ]
     # Merge calculated values back to final_report_format
     merge_columns = (
-        ["label_id"]
-        + [f"final_{col}" for col in calculated_columns]
-        + breach_columns
+        ["label_id"] + [f"final_{col}" for col in calculated_columns] + breach_columns
     )
 
     final_report_format = final_report_format.merge(
@@ -2057,9 +2096,7 @@ for idx, scenario in grouped_scenarios.iterrows():
     # Read expected output and merge
     expected_output = pd.read_excel(org_path, sheet_name="Expected Output")
     # Keep only expected columns for calculated columns
-    expected_columns = ["label_id"] + [
-        f"expected_{col}" for col in calculated_columns
-    ]
+    expected_columns = ["label_id"] + [f"expected_{col}" for col in calculated_columns]
     expected_output = expected_output[expected_columns]
 
     final_report_format = final_report_format.merge(
@@ -2068,10 +2105,9 @@ for idx, scenario in grouped_scenarios.iterrows():
 
     # Calculate differences between expected and final values
     for col in calculated_columns:
-        final_report_format[f"{col} Diff"] = (
-            final_report_format[f"final_{col}"]
-            - pd.to_numeric(final_report_format[f"expected_{col}"], errors="coerce")
-        )
+        final_report_format[f"{col} Diff"] = final_report_format[
+            f"final_{col}"
+        ] - pd.to_numeric(final_report_format[f"expected_{col}"], errors="coerce")
 
     logging.warning(f"Differences calculated for calculated columns.")
 
@@ -2091,20 +2127,18 @@ for idx, scenario in grouped_scenarios.iterrows():
             for col_name in calculated_columns:
                 # Create a column name for the bucketed values per calculated column
                 bucket_column_name = f"{col_name}_{bucket_id}"
-                final_report_format[bucket_column_name] = (
-                    final_report_format.apply(
-                        lambda row: (
-                            bucketed_values_dict.get(
-                                (row["label_id"], col_name), {}
-                            ).get(bucket_id, 0)
-                            if label_id_column_to_bucketing_applicability.get(
-                                (row["label_id"], col_name), "No"
-                            )
-                            == "Yes"
-                            else None
-                        ),
-                        axis=1,
-                    )
+                final_report_format[bucket_column_name] = final_report_format.apply(
+                    lambda row: (
+                        bucketed_values_dict.get((row["label_id"], col_name), {}).get(
+                            bucket_id, 0
+                        )
+                        if label_id_column_to_bucketing_applicability.get(
+                            (row["label_id"], col_name), "No"
+                        )
+                        == "Yes"
+                        else None
+                    ),
+                    axis=1,
                 )
 
     # Save outputs
@@ -2122,9 +2156,6 @@ for idx, scenario in grouped_scenarios.iterrows():
     logging.warning(f"file_path_rule_grp: {file_path_rule_grp}")
     logging.warning(f"file_path_rule: {file_path_rule}")
 
-    import io
-    import logging
-
     # Prepare memory buffers
     file_buffer_ans = io.BytesIO()
     file_buffer_rule_grp = io.BytesIO()
@@ -2135,9 +2166,7 @@ for idx, scenario in grouped_scenarios.iterrows():
 
         # Write data to memory buffers
         final_report_format.to_excel(file_buffer_ans, index=False)
-        logging.warning(
-            "Written 'final_report_format' to memory buffer successfully."
-        )
+        logging.warning("Written 'final_report_format' to memory buffer successfully.")
 
         rule_group_def_scenario.to_excel(file_buffer_rule_grp, index=False)
         logging.warning(
@@ -2145,23 +2174,17 @@ for idx, scenario in grouped_scenarios.iterrows():
         )
 
         rule_def_scenario.to_excel(file_buffer_rule, index=False)
-        logging.warning(
-            "Written 'rule_def_scenario' to memory buffer successfully."
-        )
+        logging.warning("Written 'rule_def_scenario' to memory buffer successfully.")
 
         # Reset buffer positions to the beginning
         file_buffer_ans.seek(0)
         logging.warning("Reset position of 'file_buffer_ans' to the beginning.")
 
         file_buffer_rule_grp.seek(0)
-        logging.warning(
-            "Reset position of 'file_buffer_rule_grp' to the beginning."
-        )
+        logging.warning("Reset position of 'file_buffer_rule_grp' to the beginning.")
 
         file_buffer_rule.seek(0)
-        logging.warning(
-            "Reset position of 'file_buffer_rule' to the beginning."
-        )
+        logging.warning("Reset position of 'file_buffer_rule' to the beginning.")
 
         # Upload the buffers directly to SFTP
         logging.warning("Starting file upload to SFTP server.")
