@@ -14,12 +14,12 @@ from dateutil.relativedelta import relativedelta
 
 pd.set_option('display.max_rows', None)
 
+
 # Set the location of your files
 location = r"C:\Users\KumarAkashdeep\Downloads\New configuration"
 
-
 # Define the paths to your files
-org_path = fr"{location}\AFL LCR Configurations.xlsx"
+org_path = fr"{location}\SLS Report A1.xlsx"
 
 file_path_rule_template = fr"{location}\rule_value_{{}}.xlsx"
 file_path_rule_grp_template = fr"{location}\rule_grp_value_{{}}.xlsx"
@@ -32,6 +32,8 @@ rule_group_def = pd.read_excel(org_path, sheet_name='rule_group_definition')
 rule_def = pd.read_excel(org_path, sheet_name='rule_definition')
 mapping_set = pd.read_excel(org_path, sheet_name='mapping_set')
 merge_master = pd.read_excel(org_path, sheet_name='merge_master')
+source_master = pd.read_excel(org_path, sheet_name='source_master')
+source_column_list = pd.read_excel(org_path, sheet_name='source_column_list')
 
 # Read the mapping of unique identifiers from the master Excel file
 table_primary_keys = pd.read_excel(org_path, sheet_name='source_master')
@@ -113,10 +115,121 @@ def read_dataframes(org_path):
             sheet_data = pd.read_excel(org_path, sheet_name=sheet)
             # Prefix column names with table_name to avoid conflicts
             sheet_data.columns = [f"{sheet}_+_{col}" for col in sheet_data.columns]
+            #sheet_data.columns = [f"{sheet}_+_{col}" if not col.startswith(f"{sheet}_+_") else f"{sheet}_+_{col}" for col in sheet_data.columns]
             dataframes[sheet] = sheet_data
             logging.warning(f"Sheet {sheet} read successfully.")
         except Exception as e:
             logging.warning(f"EXCEL SHEET {sheet} is MISSING: {e}")
+    return dataframes
+
+
+def group_filter_data():
+    """
+    Reads required sheets from the Excel file and groups columns by table_name in a dictionary.
+    """
+    # Helper function to check if a dataset exists and is not empty
+    def dataset_exists(dataset_name):
+        if dataset_name not in globals():
+            logging.warning(f"Dataset '{dataset_name}' is not defined!")
+            return False
+        dataset = globals()[dataset_name]
+        if dataset is None or dataset.empty:
+            logging.warning(f"Dataset '{dataset_name}' is empty!")
+            return False
+        return True
+
+    # Helper function to prepare DataFrame with uniform columns
+    def prepare_dataframe(df, columns, new_column_names):
+        missing_columns = [col for col in columns if col not in df.columns]
+        if missing_columns:
+            logging.warning(f"Missing columns: {missing_columns}")
+            raise ValueError(f"Missing columns: {missing_columns}")
+        df_copy = df[columns].copy()
+        df_copy.columns = new_column_names
+        return df_copy
+
+    # List of datasets and their corresponding parameters for preparation
+    datasets = [
+        ("rule_def_scenario", ['condition_source_table', 'condition_column_name'], ['table_name', 'column_name'], "rule_def_scenario_copy_1"),
+        ("rule_def_scenario", ['value_source_table', 'value_source_column'], ['table_name', 'column_name'], "rule_def_scenario_copy_2"),
+        ("rule_def_scenario", ['weight_source_table', 'weight_source_column'], ['table_name', 'column_name'], "rule_def_scenario_copy_3"),
+        ("rule_group_def_scenario", ['threshold_source_table', 'threshold_filter_column'], ['table_name', 'column_name'], "rule_group_def_scenario_copy_1"),
+        ("rule_group_def_scenario", ['threshold_source_table', 'threshold_value'], ['table_name', 'column_name'], "rule_group_def_scenario_copy_2"),
+        ("rule_based_bucketing", ['condition_source_table', 'condition_column_name'], ['table_name', 'column_name'], "rule_based_bucketing_copy_1"),
+        ("reporting_bucketing_adjustment", ['condition_source_table', 'condition_column_name'], ['table_name', 'column_name'], "reporting_bucketing_adjustment_copy_1"),
+        ("reporting_bucketing_adjustment", ['value_source_table', 'value_source_column'], ['table_name', 'column_name'], "reporting_bucketing_adjustment_copy_2"),
+        ("merge_master", ['value_source_table', 'left_key'], ['table_name', 'column_name'], "merge_master_copy_1"),
+        ("merge_master", ['condition_source_table', 'right_key'], ['table_name', 'column_name'], "merge_master_copy_2"),
+        ("source_master", ['source_table_name', 'primary_key'], ['table_name', 'column_name'], "source_master_copy_1"),
+        ("source_column_list", ['source_table_name', 'source_table_column'], ['table_name', 'column_name'], "source_column_list_copy_1"),
+        ("currency_conversion_master", ['table_name', 'currency_column'], ['table_name', 'column_name'], "currency_conversion_master_copy_1"),
+        ("currency_conversion_master", ['table_name', 'date_column'], ['table_name', 'column_name'], "currency_conversion_master_copy_2"),
+        ("currency_conversion_master", ['table_name', 'entity_column'], ['table_name', 'column_name'], "currency_conversion_master_copy_3"),
+        ("limit_setup", ['column_identifier_table', 'column_identifier'], ['table_name', 'column_name'], "limit_setup_copy_1"),
+        ("limit_setup", ['column_identifier_table', 'rule_group'], ['table_name', 'column_name'], "limit_setup_copy_2"),
+    ]
+
+    prepared_dataframes = []
+
+    # Prepare DataFrames only if the dataset exists and is defined
+    for dataset_name, columns, new_column_names, var_name in datasets:
+        if dataset_exists(dataset_name):
+            try:
+                dataset = globals()[dataset_name]
+                prepared_dataframes.append(prepare_dataframe(dataset, columns, new_column_names))
+                logging.info(f"Prepared DataFrame for '{var_name}' successfully.")
+            except ValueError as ve:
+                logging.warning(f"Column error in '{var_name}': {ve}")
+            except Exception as e:
+                logging.warning(f"Error preparing DataFrame for '{var_name}': {e}")
+
+    # Concatenate all the prepared DataFrames
+    unique_sheet_column_combination = pd.concat(prepared_dataframes, ignore_index=True).drop_duplicates()
+
+    # Create dictionary: Group by 'table_name'
+    grouped_data = (
+        unique_sheet_column_combination.groupby('table_name')['column_name']
+        .apply(list)
+        .to_dict()
+    )
+    logging.info(f"Processed DataFrame (first 5 rows):\n{unique_sheet_column_combination.head()}")
+
+    logging.info("\nStep 2: Grouping by 'table_name'.")
+    for table, columns in grouped_data.items():
+        logging.info(f"Table: {table} | Mapped Columns: {columns}")
+
+    return grouped_data
+
+def filter_dataframes_by_grouped_data(dataframes, grouped_data):
+    for table_name, columns in grouped_data.items():
+        # Ensure the dataframe for this table exists
+        logging.warning(f"Table Name: {table_name}")
+        if table_name not in dataframes:
+            logging.warning(f"Table {table_name} not found in dataframes.")
+            continue
+        df = dataframes[table_name]
+        # Prepare a list to hold all relevant columns (transformed and standalone)
+        relevant_columns = []
+        for column in columns:
+            transformed_column = f"{table_name}_+_{column}"
+            # Check if the transformed column already exists in relevant_columns
+            if transformed_column in df.columns and transformed_column not in relevant_columns:
+                relevant_columns.append(transformed_column)
+                logging.warning(f"Adding Transformed_column : {transformed_column}")
+            elif column in df.columns and column not in relevant_columns:
+                # Add the standalone column if it exists
+                relevant_columns.append(column)
+                logging.warning(f"Original column is added {column}")
+            else:
+                logging.warning(f"{transformed_column} or {column} not found.")
+        # Remove duplicates (if any) to ensure no redundancy
+        relevant_columns = list(set(relevant_columns))
+        # Filter the dataframe to only include the relevant columns
+        df = df[relevant_columns]
+        # Log the result
+        logging.warning(f"Table: {table_name} | Filtered Columns: {relevant_columns} | Filtered Columns' Length : {len(relevant_columns)}")
+        # Ensure you update the dataframe in the dataframes list
+        dataframes[table_name] = df
     return dataframes
 
 def dynamic_merge(merge_master, dataframes):
@@ -212,7 +325,7 @@ def dynamic_merge(merge_master, dataframes):
     
     logging.warning(f"  ")
     logging.warning("All merges completed in config table order.")
-    time.sleep(10)
+    time.sleep(7)
 
     return merged_data
 
@@ -223,10 +336,21 @@ def get_all_dataframes_dict(merge_master, merged_data, dataframes):
     all_dataframes_dict = dataframes.copy()
     for index, row in merge_master.iterrows():
         table_name = row['value_source_table']
-        if table_name in merged_data:
-            all_dataframes_dict[table_name] = merged_data[table_name]
-        else:
-            all_dataframes_dict[table_name] = dataframes[table_name]
+        try:
+          if table_name in merged_data:
+              
+              all_dataframes_dict[table_name] = merged_data[table_name]
+          else:
+              
+              if table_name in dataframes:
+                  logging.warning(f'This Table : {table_name} is not found. The size is {dataframes[table_name].shape}.')
+                  all_dataframes_dict[table_name] = dataframes[table_name]
+              else:
+                  logging.warning(f'This Table : {table_name} is not found. Initializing an empty DataFrame.')
+                  all_dataframes_dict[table_name] = pd.DataFrame()
+        except KeyError:
+            logging.warning(f'This Table : {table_name} is not found. Initializing an empty DataFrame.')
+            all_dataframes_dict[table_name] = pd.DataFrame()
     return all_dataframes_dict
 
 def conversion(dataframes, currency_conversion_master, currency_conversion_rate, base, reporting_currency):
@@ -323,6 +447,13 @@ def evaluate_condition(df, condition):
     ####### Convert the column to the specified datatype
     try:
         if condition_datatype == 'Integer':
+            df[condition_column_name] = df[condition_column_name].astype(str)
+            df[condition_column_name] = df[condition_column_name].str.lower()
+            df[condition_column_name] = df[condition_column_name].replace({'false': 0, 'true': 1})
+            df[condition_column_name] = df[condition_column_name].astype(int)
+            logging.warning(f" inside integer conversion for column ")
+            df[condition_column_name] = df[condition_column_name].astype(int)
+        
             df_column = df[condition_column_name].astype(int)
         elif condition_datatype == 'Numeric' or condition_datatype == 'Float':
             df_column = df[condition_column_name].astype(float)
@@ -364,28 +495,30 @@ def evaluate_condition(df, condition):
     
     logging.warning(f" final condition_value post conversion's and all : {condition_value}")
     
-    if condition['condition_type'] == 'Contains':
+    operation_type = condition['condition_type'].lower()
+
+    if operation_type == 'contains':
         mapping_values = mapping_set[mapping_set['mapping_set'] == condition_value]['mapping_criteria'].tolist()
         # logging.warning(f"Mapping values for 'Contains': {mapping_values}")
         return df_column.isin(mapping_values)
-    elif condition['condition_type'] == 'Does not Contain':
+    elif operation_type == 'noes not contain':
         mapping_values = mapping_set[mapping_set['mapping_set'] == condition_value]['mapping_criteria'].tolist()
         # logging.warning(f"Mapping values for 'Does not Contain': {mapping_values}")
         return ~df_column.isin(mapping_values)
-    elif condition['condition_type'] == 'Equal to':
+    elif operation_type == 'equal to':
         return df_column == value
-    elif condition['condition_type'] == 'Not Equals':
+    elif operation_type == 'not equals':
         return df_column != value
-    elif condition['condition_type'] == 'Greater Than':
+    elif operation_type == 'greater than':
         return df_column > value
-    elif condition['condition_type'] == 'Smaller Than':
+    elif operation_type == 'smaller than':
         return df_column < value
-    elif condition['condition_type'] == 'Greater Than Equal to':
+    elif operation_type == 'greater than equal to':
         return df_column >= value
-    elif condition['condition_type'] == 'Smaller Than Equal to':
+    elif operation_type == 'smaller than equal to':
         return df_column <= value
     else:
-        logging.warning(f"Unknown condition type: -{condition['condition_type']}-")
+        logging.warning(f"Unknown condition type: -{operation_type}-")
         # Return a Series of True with the same index as df
         return pd.Series([True] * len(df), index=df.index)
 
@@ -538,9 +671,12 @@ for idx, scenario in grouped_scenarios.iterrows():
     # Read DataFrames from Excel
     dataframes = read_dataframes(org_path)
 
-    # Filter dataframes based on currency_list
+    # Filter dataframes based on currency_list,  source_filtering_logic
+    
+    grouped_data = group_filter_data()
+    dataframes = filter_dataframes_by_grouped_data(dataframes, grouped_data)
+    
     dataframes = filter_dataframes_by_currency(dataframes, currency_conversion_master_scenario, currency_list)
-
     # Perform currency conversion
     base = rule_def_scenario[['value_source_table', 'value_source_column']].drop_duplicates()
     dataframes = conversion(dataframes, currency_conversion_master_scenario, currency_conversion_rate, base, reporting_currency)
@@ -548,6 +684,18 @@ for idx, scenario in grouped_scenarios.iterrows():
     # Perform dynamic merge
     merged_data = dynamic_merge(merge_master, dataframes)
     # raise Exception("break after dynamic merge")
+
+
+    # for key, df in dataframes.items():
+    #     time.sleep(1)
+    #     logging.warning(f"The shape of the dataframe '{key}' is: {df.shape}")
+    #     df.to_csv(f"{key}_data.csv", index = False)
+
+
+    # for key, df in merged_data.items():
+    #     time.sleep(1)
+    #     logging.warning(f"The shape of the dataframe '{key}' is: {df.shape}")
+    #     df.to_csv(f"{key}_.csv", index = False)
 
     # Get all dataframes
     all_dataframes_dict = get_all_dataframes_dict(merge_master, merged_data, dataframes)
@@ -649,10 +797,10 @@ for idx, scenario in grouped_scenarios.iterrows():
         for i in range(len(conditions)):
             logging.warning("   ")
             condition = conditions.iloc[i]
-            # logging.warning(f"Applying condition: {condition}")
+            logging.warning(f"Applying condition: {condition}")
             column_name = condition['condition_column_name']
             if column_name not in df.columns:
-                logging.warning(f"Missing column: {column_name}")
+                logging.warning(f"Missing column: {column_name}  in {sheet_name}")
                 logging.warning("Returning default value 0.")
                 return {}, 0
     
@@ -698,7 +846,7 @@ for idx, scenario in grouped_scenarios.iterrows():
             
             # Check if weight_source_table is in all_dataframes_dict
             if weight_source_table not in all_dataframes_dict:
-                logging.warning(f"Missing weight source table: {weight_source_table}")
+                logging.warning(f"710 Missing weight source table: {weight_source_table}")
                 return {}, 0
             
             weight_df = all_dataframes_dict[weight_source_table]
@@ -753,38 +901,51 @@ for idx, scenario in grouped_scenarios.iterrows():
                 return {}, 0    
                        
             
-            # Calculate weighted average
+            logging.warning(f"Columns: {list(df.columns)}")
+            logging.warning(f"Length of df: {len(df)}")
+
+            # Check dtypes
+            logging.warning(f"Dtypes:\n{df.dtypes}")
+            logging.warning(f"Dtypes:\n{df.shape}")
+
+            # Convert to float if necessary
+            df[value_column_full] = df[value_column_full].astype(float)
+            df[weight_column_full] = df[weight_column_full].astype(float)
+
             try:
-                logging.warning(f"  inside try catch block  ")
+                start = time.time()
                 a = df[value_column_full].sum()
-                logging.warning(f"  a {a}   ")
+                logging.warning(f"Summation '{value_column_full}' took {time.time()-start:.2f}s; result={a}")
+
+                start = time.time()
                 b = df[weight_column_full].sum()
-                logging.warning(f"  b {b}   ")
-                
+                logging.warning(f"Summation '{weight_column_full}' took {time.time()-start:.2f}s; result={b}")
+
+                start = time.time()
                 weighted_sum = (df[value_column_full] * df[weight_column_full]).sum()
-                logging.warning(f"  sum product is  num a {df[value_column_full].sum()}   ")
-                total_weight = df[weight_column_full].sum()
-                logging.warning(f"  weighted_sumis{weighted_sum}   ")
-                logging.warning(f"   total_weightis{total_weight}  ")
-                
-                # df.to_csv("target_dataframe_after.csv", index = False )
-                logging.warning(f"  line 603 target mentioned ")
-                
-                if operation_to_perform == 'weighted average' and  total_weight != 0:
+                logging.warning(f"Weighted_sum took {time.time()-start:.2f}s; result={weighted_sum}")
+
+                total_weight = b  # or df[weight_column_full].sum() again, but we already have b
+                logging.warning(f"total_weight = {total_weight}")
+
+                if operation_to_perform == 'weighted average' and total_weight != 0:
                     final_value = weighted_sum / total_weight
-                    logging.warning(f" weighted average  final_value {final_value} ")
+                    logging.warning(f"weighted average final_value {final_value}")
                 elif operation_to_perform == 'sum product':
                     final_value = weighted_sum
-                    logging.warning(f" sum porduct final_value {final_value} ")
+                    logging.warning(f"sum product final_value {final_value}")
                 else:
-                    logging.warning("Total weight is zero, cannot compute weighted average.")
+                    logging.warning("Total weight is zero or unknown operation.")
                     final_value = 0
-                
+
             except Exception as e:
-                logging.warning(f"Error during weighted average / sum porduct calculation: {e}")
+                logging.warning(f"Error during calculation: {e}")
                 final_value = 0
             
         else:
+            column_name = conditions['value_source_column'].iloc[-1]
+            df[column_name] = pd.to_numeric(df[column_name], errors='coerce')
+            logging.warning(f" conveting numerical values ")
             final_value = df[conditions['value_source_column'].iloc[-1]].agg(operation_to_perform)
             
         rule_def_scenario.loc[conditions.index, 'final_value'] = final_value
@@ -901,15 +1062,16 @@ for idx, scenario in grouped_scenarios.iterrows():
                 if 'tenor' in condition and 'tenor_unit' in condition:
                     if pd.notnull(condition['tenor']) and pd.notnull(condition['tenor_unit']):
                         tenor_unit = condition['tenor_unit'].lower()  # Normalize to lowercase
+                        tenor_value = int(condition['tenor'])
                 
                         if tenor_unit == 'd':  # Days
-                            new_date = reporting_date + pd.Timedelta(days=condition['tenor'])
+                            new_date = reporting_date + pd.Timedelta(days=tenor_value)
                         elif tenor_unit == 'm':  # Months
-                            new_date = reporting_date + relativedelta(months=condition['tenor'])
+                            new_date = reporting_date + relativedelta(months=tenor_value)
                         elif tenor_unit == 'q':  # Quarters
-                            new_date = reporting_date + relativedelta(months=condition['tenor'] * 3)
+                            new_date = reporting_date + relativedelta(months=tenor_value * 3)
                         elif tenor_unit == 'y':  # Years
-                            new_date = reporting_date + relativedelta(years=condition['tenor'])
+                            new_date = reporting_date + relativedelta(years=tenor_value)
                         else:
                             new_date = None
                             calculated_time_to_maturity = None
@@ -942,7 +1104,7 @@ for idx, scenario in grouped_scenarios.iterrows():
                 temp_df = temp_df[condition_result]
                 
                 logging.warning(f" apply rule based bucketing  after filter lenght {len(temp_df)}")
-                logging.warning(f"  temp_df {temp_df}")
+                
                 
                 if temp_df.empty:
                     break
@@ -952,7 +1114,7 @@ for idx, scenario in grouped_scenarios.iterrows():
                 temp_df['bucket_id'] = bucket_id
                 bucketed_data.append(temp_df)
         
-        logging.warning(f" bucketed_data: {bucketed_data}")
+        # logging.warning(f" bucketed_data: {bucketed_data}")
         if bucketed_data:
             # Combine all bucketed data
             df_bucketed = pd.concat(bucketed_data, ignore_index=True)
@@ -988,15 +1150,19 @@ for idx, scenario in grouped_scenarios.iterrows():
             reporting_bucketing_adjustment['bucketing_rule_id'] == adjustment_rule
         ]
         adjusted_df = df.copy()
+        # logging.warning(f" column name is  {adjusted_df.columns}  ")
     
         # Log initial bucketed values
         initial_bucketed_values = adjusted_df.groupby('bucket_id')[value_source_column].sum().to_dict()
         logging.warning(f"Initial bucketed values: {initial_bucketed_values}")
     
         for idx, row in adjustments.iterrows():
+            logging.warning(f"    ")
+
             from_bucket = row['from_bucket_id']
             to_bucket = row['to_bucket_id']
             if from_bucket == to_bucket:
+                logging.warning(f" {from_bucket}  movement in   {to_bucket}")
                 logging.warning(f" Skipped as netting was taken into account the movemnet it quafiled ")
                 continue
             
@@ -1028,7 +1194,7 @@ for idx, scenario in grouped_scenarios.iterrows():
             # Apply condition only to rows in from_bucket
             from_bucket_mask = adjusted_df['bucket_id'] == from_bucket
             df_from_bucket = adjusted_df[from_bucket_mask]
-    
+            
             logging.warning(f"Before condition filter, from_bucket {from_bucket} has {len(df_from_bucket)} rows")
     
             if df_from_bucket.empty:
@@ -1099,7 +1265,9 @@ for idx, scenario in grouped_scenarios.iterrows():
         bucketed_values = {}
 
         for idx, row in static_buckets.iterrows():
+            
             percentage = float(row['percentage']) / 100
+            logging.warning(f" percentage at {idx} : {percentage}")
             bucket_id = row['bucket_id']
             bucketed_values[bucket_id] = final_value * percentage
 
@@ -1131,9 +1299,20 @@ for idx, scenario in grouped_scenarios.iterrows():
         Evaluates a rule group and returns combined bucketed values and final value.
         """
         logging.warning(f"Evaluating rule group: {rule_group}")
-        bucketing_applicability = rule_group_to_bucketing_applicability.get(rule_group, 'No')
+        bucketing_applicability = rule_group_to_bucketing_applicability.get(rule_group, 'Yes')
         logging.warning(f"Evaluating rule group: {rule_group} and bucketing_applicability: {bucketing_applicability}")
         group_def = rule_group_def_scenario[rule_group_def_scenario['rule_group'] == rule_group]
+        
+        try:
+            group_def['execution_order'].fillna(100000, inplace=True)
+            group_def['execution_order'] = rule_group_def_scenario['execution_order'].astype(int)
+            group_def.sort_values('execution_order', ascending=True, inplace=True)
+            logging.warning('Sorted ruel group def. using execution order.')
+            logging.warning(f'Group Def : {group_def.head()}')
+            logging.warning(f'Group Def : {group_def.tail()}')
+        except KeyError:
+            logging.warning('Execution order column is not found in rule group definition.')    
+
         if len(group_def) < 1:
             logging.warning(f"Missing rule group: {rule_group}")
             logging.warning("Returning default value 0.")
@@ -1340,7 +1519,13 @@ for idx, scenario in grouped_scenarios.iterrows():
         threshold_filter_value = group_def.iloc[0]['threshold_filter_value']
         
         logging.warning(f"Applying threshold criteria: {threshold_criteria} with threshold value: {threshold_value}")
-        
+        try:
+            threshold_value = float(threshold_value)
+            logging.warning(f" converted values to flaot  {threshold_value}")
+        except (ValueError, TypeError):
+            logging.warning(f" passing as thrsohold is string cant be converted {threshold_value}")
+            pass
+
         # Fetch dynamic threshold value if necessary
         if isinstance(threshold_value, str) and not threshold_value.replace('.', '', 1).isdigit():
             # Fetch the threshold value from the specified table and filters
@@ -1454,7 +1639,8 @@ for idx, scenario in grouped_scenarios.iterrows():
     final_report_format = report_format_scenario.copy()
 
     # Sort report_format_scenario based on 'execution_order'
-    report_format_scenario['execution_order'].fillna(np.inf, inplace=True)
+    report_format_scenario['execution_order'].fillna(100000, inplace=True)
+    report_format_scenario['execution_order'] = report_format_scenario['execution_order'].astype(int)
     report_format_scenario.sort_values('execution_order', ascending=True, inplace=True)
 
     # Evaluate calculated columns based on 'column_type' sheet
@@ -1482,7 +1668,7 @@ for idx, scenario in grouped_scenarios.iterrows():
             logging.warning(f"   ")
             logging.warning(f"   ")
             
-            if col_name_indexer == 1 and loop_indexer > 54:
+            if col_name_indexer == 1 and loop_indexer > 38:
                 # break
                 pass
             
