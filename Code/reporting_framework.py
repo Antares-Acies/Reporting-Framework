@@ -9,52 +9,59 @@ import numpy as np
 import logging
 import pandas as pd
 import xlsxwriter
-import time,os,datetime
+import time, os, datetime
 from dateutil.relativedelta import relativedelta
+from concurrent.futures import ThreadPoolExecutor
+
 
 pd.set_option('display.max_rows', None)
 
-
 # Set the location of your files
-location = r"C:\Users\KumarAkashdeep\Downloads\New configuration"
+location = r"C:\Users\DeveshArya\Reporting Framework\Reporting-Framework\Code"
 
 # Define the paths to your files
-org_path = fr"{location}\SLS Report A1.xlsx"
+org_path = fr"{location}\SLS Configurations - Suryoday.xlsx"
 
 file_path_rule_template = fr"{location}\rule_value_{{}}.xlsx"
 file_path_rule_grp_template = fr"{location}\rule_grp_value_{{}}.xlsx"
 file_path_ans_template = fr"{location}\result_report_format_{{}}.xlsx"
 
-# Read initial dataframes
-logging.warning("Reading initial dataframes...")
-report_format = pd.read_excel(org_path, sheet_name='report_format')
-rule_group_def = pd.read_excel(org_path, sheet_name='rule_group_definition')
-rule_def = pd.read_excel(org_path, sheet_name='rule_definition')
-mapping_set = pd.read_excel(org_path, sheet_name='mapping_set')
-merge_master = pd.read_excel(org_path, sheet_name='merge_master')
-source_master = pd.read_excel(org_path, sheet_name='source_master')
-source_column_list = pd.read_excel(org_path, sheet_name='source_column_list')
+# Read all sheets at once
+all_sheets = pd.read_excel(org_path, sheet_name=None, engine='openpyxl')
+logging.warning("Read the Workbook successfully.")
 
-# Read the mapping of unique identifiers from the master Excel file
-table_primary_keys = pd.read_excel(org_path, sheet_name='source_master')
+# Extract the required sheets
+report_format = all_sheets['report_format']
+rule_group_def = all_sheets['rule_group_definition']
+rule_def = all_sheets['rule_definition']
+mapping_set = all_sheets['mapping_set']
+merge_master = all_sheets['merge_master']
+source_master = all_sheets['source_master']
+source_column_list = all_sheets['source_column_list']
+currency_pair_master = all_sheets['currency_pair_master']
+currency_conversion_master = all_sheets['currency_conversion_master']
+quoted_security_data = all_sheets['quoted_security_data']
+currency_scenario_config = all_sheets['currency_scenario_config']
+currency_conversion_exemption = all_sheets['currency_conversion_exemption']
+column_type = all_sheets['column_type']
+bucket_definition = all_sheets['bucket_definition']
+bucket_rule_mapping = all_sheets['bucketing_rule_mapping']
+bucketing_type = all_sheets['bucketing_type']
+rule_based_bucketing = all_sheets['rule_based_bucketing']
+static_pattern_bucketing = all_sheets['static_pattern_bucketing']
+reporting_pattern_bucketing = all_sheets['reporting_pattern_bucketing']
+reporting_bucketing_adjustment = all_sheets['reporting_bucketing_adjustment']
+limit_setup = all_sheets['limit_setup']
+
+# Example of processing data
+table_primary_keys = source_master.copy()
 table_primary_keys['Primary key'] = table_primary_keys.apply(
     lambda row: f"{row['source_table_name']}_+_{row['primary_key']}", axis=1
 )
-logging.warning("Initial dataframes read successfully.")
 
-# Important for reporting currency related logic
-logging.warning("Reading currency-related data...")
-currency_pair_master = pd.read_excel(org_path, sheet_name='currency_pair_master')
-currency_conversion_master = pd.read_excel(org_path, sheet_name='currency_conversion_master')
-quoted_security_data = pd.read_excel(org_path, sheet_name='quoted_security_data')
-currency_scenario_config = pd.read_excel(org_path, sheet_name='currency_scenario_config')
-currency_conversion_exemption = pd.read_excel(org_path, sheet_name='currency_conversion_exemption')
-currency_conversion_exemption['value_source_column'] = currency_conversion_exemption['value_source_table']  + "_+_" + currency_conversion_exemption['value_source_column']
-logging.warning("Currency-related data read successfully.")
-
-# Read 'column_type' data to get 'bucketing_applicability' flag and columns to calculate
-logging.warning("Reading column type data...")
-column_type = pd.read_excel(org_path, sheet_name='column_type')
+# Further processing...
+currency_conversion_exemption['value_source_column'] = currency_conversion_exemption['value_source_table'] + "_+_" + currency_conversion_exemption['value_source_column']
+rule_based_bucketing['condition_column_name'] = rule_based_bucketing['condition_source_table'] + "_+_" + rule_based_bucketing['condition_column_name']
 
 # Get the list of columns that need to be calculated
 calculated_columns = column_type[column_type['calculated_column'] == 'Yes']['column_name'].tolist()
@@ -62,23 +69,11 @@ logging.warning(f"Columns to be calculated: {calculated_columns}")
 
 # Check if bucketing is applicable for any of the columns
 bucketing_flag_global = 'Yes' if 'Yes' in column_type['bucketing_applicability'].values else 'No'
-logging.warning(f"Bucketing applicability  bucketing_flag_global  flag: {bucketing_flag_global}")
-
+logging.warning(f"Bucketing applicability flag: {bucketing_flag_global}")
 
 # Read bucketing-related data if any column requires bucketing
 if 'Yes' in column_type['bucketing_applicability'].values:
     logging.warning("Reading bucketing-related data...")
-    bucket_definition = pd.read_excel(org_path, sheet_name='bucket_definition')
-    bucket_rule_mapping = pd.read_excel(org_path, sheet_name='bucketing_rule_mapping')
-    bucketing_type = pd.read_excel(org_path, sheet_name='bucketing_type')
-    rule_based_bucketing = pd.read_excel(org_path, sheet_name='rule_based_bucketing')
-    rule_based_bucketing['condition_column_name'] = rule_based_bucketing['condition_source_table'] + "_+_" + rule_based_bucketing['condition_column_name']
-    static_pattern_bucketing = pd.read_excel(org_path, sheet_name='static_pattern_bucketing')
-    reporting_pattern_bucketing = pd.read_excel(org_path, sheet_name='reporting_pattern_bucketing')
-    # Read the reporting bucketing adjustment data
-    reporting_bucketing_adjustment = pd.read_excel(org_path, sheet_name='reporting_bucketing_adjustment')
-    logging.warning("Bucketing-related data read successfully.")
-    # Initialize bucket_ids
     bucket_ids = bucket_definition['bucket_id'].unique().tolist()
     if 'Unbucketed' not in bucket_ids:
         bucket_ids.append('Unbucketed')
@@ -86,10 +81,7 @@ else:
     # If bucketing is not applicable, set bucket_ids to []
     bucket_ids = []
 
-# Read limit setup data
-logging.warning("Reading limit setup data...")
-limit_setup = pd.read_excel(org_path, sheet_name='limit_setup')
-logging.warning("Limit setup data read successfully.")
+logging.warning("All dataframes read successfully.")
 
 # Function definitions
 
@@ -774,7 +766,8 @@ for idx, scenario in grouped_scenarios.iterrows():
         bucketing_applicability = rule_group_to_bucketing_applicability.get(rule_group, 'Yes')
         if bucketing_flag_global == "No":
             bucketing_applicability = "No"
-            
+
+      
         conditions = rule_def_scenario[rule_def_scenario['condition_rule_set'] == rule_set]
         if len(conditions) < 1:
             logging.warning(f"Missing rule set: {rule_set}")
@@ -797,10 +790,10 @@ for idx, scenario in grouped_scenarios.iterrows():
         for i in range(len(conditions)):
             logging.warning("   ")
             condition = conditions.iloc[i]
-            logging.warning(f"Applying condition: {condition}")
+            # logging.warning(f"Applying condition: {condition}")
             column_name = condition['condition_column_name']
             if column_name not in df.columns:
-                logging.warning(f"Missing column: {column_name}  in {sheet_name}")
+                logging.warning(f"Missing column: {column_name}")
                 logging.warning("Returning default value 0.")
                 return {}, 0
     
@@ -831,7 +824,7 @@ for idx, scenario in grouped_scenarios.iterrows():
         logging.warning(f"      ")
         logging.warning(f"      ")
         logging.warning(f"      ")
-        # df.to_csv("target_dataframe_247.csv", index = False )
+        # df.to_csv("target_dataframe_.csv", index = False )
         logging.warning(f"      ")
         logging.warning(f"      ")
         logging.warning(f"      ")
@@ -846,7 +839,7 @@ for idx, scenario in grouped_scenarios.iterrows():
             
             # Check if weight_source_table is in all_dataframes_dict
             if weight_source_table not in all_dataframes_dict:
-                logging.warning(f"710 Missing weight source table: {weight_source_table}")
+                logging.warning(f"Missing weight source table: {weight_source_table}")
                 return {}, 0
             
             weight_df = all_dataframes_dict[weight_source_table]
@@ -901,33 +894,38 @@ for idx, scenario in grouped_scenarios.iterrows():
                 return {}, 0    
                        
             
+            # Calculate weighted average
             logging.warning(f"Columns: {list(df.columns)}")
             logging.warning(f"Length of df: {len(df)}")
-
+ 
             # Check dtypes
             logging.warning(f"Dtypes:\n{df.dtypes}")
             logging.warning(f"Dtypes:\n{df.shape}")
-
+ 
             # Convert to float if necessary
             df[value_column_full] = df[value_column_full].astype(float)
             df[weight_column_full] = df[weight_column_full].astype(float)
-
+ 
             try:
                 start = time.time()
                 a = df[value_column_full].sum()
                 logging.warning(f"Summation '{value_column_full}' took {time.time()-start:.2f}s; result={a}")
-
+ 
                 start = time.time()
                 b = df[weight_column_full].sum()
                 logging.warning(f"Summation '{weight_column_full}' took {time.time()-start:.2f}s; result={b}")
-
+ 
                 start = time.time()
                 weighted_sum = (df[value_column_full] * df[weight_column_full]).sum()
                 logging.warning(f"Weighted_sum took {time.time()-start:.2f}s; result={weighted_sum}")
-
+ 
                 total_weight = b  # or df[weight_column_full].sum() again, but we already have b
                 logging.warning(f"total_weight = {total_weight}")
 
+                df_copy = df.copy(deep=True)
+                df_copy[value_column_full] = (df[value_column_full] * df[weight_column_full])
+                df = df_copy
+              
                 if operation_to_perform == 'weighted average' and total_weight != 0:
                     final_value = weighted_sum / total_weight
                     logging.warning(f"weighted average final_value {final_value}")
@@ -937,16 +935,17 @@ for idx, scenario in grouped_scenarios.iterrows():
                 else:
                     logging.warning("Total weight is zero or unknown operation.")
                     final_value = 0
-
+ 
             except Exception as e:
                 logging.warning(f"Error during calculation: {e}")
                 final_value = 0
             
         else:
-            column_name = conditions['value_source_column'].iloc[-1]
-            df[column_name] = pd.to_numeric(df[column_name], errors='coerce')
-            logging.warning(f" conveting numerical values ")
-            final_value = df[conditions['value_source_column'].iloc[-1]].agg(operation_to_perform)
+          
+          column_name = conditions['value_source_column'].iloc[-1]
+          df[column_name] = pd.to_numeric(df[column_name], errors='coerce')
+          logging.warning(f" conveting numerical values ")
+          final_value = df[conditions['value_source_column'].iloc[-1]].agg(operation_to_perform)
             
         rule_def_scenario.loc[conditions.index, 'final_value'] = final_value
         logging.warning(f"Final value for {rule_set} is {final_value}")
@@ -959,7 +958,6 @@ for idx, scenario in grouped_scenarios.iterrows():
             # Get the bucketing_rule_set for this rule_id
             bucketing_rule_row = bucket_rule_mapping[bucket_rule_mapping['reporting_rule_id'] == rule_set]
             if not bucketing_rule_row.empty:
-                #changed unweighted to bucketing_rule
                 bucketing_rule_set = bucketing_rule_row['bucketing_rule'].values[0]
                 adjustment_rule = bucketing_rule_row.get('adjustment_rule', np.nan).values[0]
                 # Get the bucketing type
@@ -1303,14 +1301,14 @@ for idx, scenario in grouped_scenarios.iterrows():
         logging.warning(f"Evaluating rule group: {rule_group} and bucketing_applicability: {bucketing_applicability}")
         group_def = rule_group_def_scenario[rule_group_def_scenario['rule_group'] == rule_group]
         
-        logging.warning(f'Rule Group Def head before sorting : {group_def.head()}')
-        try:    
+        try:
+            logging.warning(f'Rule Group Def head before sorting : {group_def.head()}')    
             group_def['execution_order'].fillna(100000, inplace=True)
             group_def['execution_order'] = group_def['execution_order'].astype(int)
             group_def.sort_values('execution_order', ascending=True, inplace=True)
+            logging.warning(f'Rule Group Def head after sorting : {group_def.head()}') 
         except KeyError:
-            logging.warning('Execution order is not found')    
-        logging.warning(f'Rule Group Def head after sorting : {group_def.head()}')  
+            logging.warning('Execution order is not found')  
 
         if len(group_def) < 1:
             logging.warning(f"Missing rule group: {rule_group}")
