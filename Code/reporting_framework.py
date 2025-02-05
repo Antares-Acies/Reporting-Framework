@@ -766,6 +766,7 @@ for idx, scenario in grouped_scenarios.iterrows():
         bucketing_applicability = rule_group_to_bucketing_applicability.get(rule_group, 'Yes')
         if bucketing_flag_global == "No":
             bucketing_applicability = "No"
+
       
         conditions = rule_def_scenario[rule_def_scenario['condition_rule_set'] == rule_set]
         if len(conditions) < 1:
@@ -789,10 +790,10 @@ for idx, scenario in grouped_scenarios.iterrows():
         for i in range(len(conditions)):
             logging.warning("   ")
             condition = conditions.iloc[i]
-            logging.warning(f"Applying condition: {condition}")
+            # logging.warning(f"Applying condition: {condition}")
             column_name = condition['condition_column_name']
             if column_name not in df.columns:
-                logging.warning(f"Missing column: {column_name}  in {sheet_name}")
+                logging.warning(f"Missing column: {column_name}")
                 logging.warning("Returning default value 0.")
                 return {}, 0
     
@@ -838,7 +839,7 @@ for idx, scenario in grouped_scenarios.iterrows():
             
             # Check if weight_source_table is in all_dataframes_dict
             if weight_source_table not in all_dataframes_dict:
-                logging.warning(f"710 Missing weight source table: {weight_source_table}")
+                logging.warning(f"Missing weight source table: {weight_source_table}")
                 return {}, 0
             
             weight_df = all_dataframes_dict[weight_source_table]
