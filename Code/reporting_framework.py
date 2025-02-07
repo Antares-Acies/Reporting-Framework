@@ -30,6 +30,9 @@ file_path_ans_template = fr"{location}\result_report_format_{{}}.xlsx"
 all_sheets = pd.read_excel(org_path, sheet_name=None, engine='openpyxl')
 logging.warning("Read the Workbook successfully.")
 
+for sheet_name, sheet_data in all_sheets.items():
+    logging.warning(f"Sheet {sheet_name}, Size: {sheet_data.shape}")
+
 # Extract the required sheets
 report_format = all_sheets['report_format']
 rule_group_def = all_sheets['rule_group_definition']
@@ -122,19 +125,19 @@ def group_filter_data():
     # Helper function to check if a dataset exists and is not empty
     def dataset_exists(dataset_name):
         if dataset_name not in globals():
-            logging.warning(f"Dataset '{dataset_name}' is not defined!")
+            #logging.warning(f"Dataset '{dataset_name}' is not defined!")
             return False
         dataset = globals()[dataset_name]
         if dataset is None or dataset.empty:
-            logging.warning(f"Dataset '{dataset_name}' is empty!")
+            #logging.warning(f"Dataset '{dataset_name}' is empty!")
             return False
         return True
-
+ 
     # Helper function to prepare DataFrame with uniform columns
     def prepare_dataframe(df, columns, new_column_names):
         missing_columns = [col for col in columns if col not in df.columns]
         if missing_columns:
-            logging.warning(f"Missing columns: {missing_columns}")
+            #logging.warning(f"Missing columns: {missing_columns}")
             raise ValueError(f"Missing columns: {missing_columns}")
         df_copy = df[columns].copy()
         df_copy.columns = new_column_names
@@ -169,7 +172,7 @@ def group_filter_data():
             try:
                 dataset = globals()[dataset_name]
                 prepared_dataframes.append(prepare_dataframe(dataset, columns, new_column_names))
-                logging.info(f"Prepared DataFrame for '{var_name}' successfully.")
+                #logging.info(f"Prepared DataFrame for '{var_name}' successfully.")
             except ValueError as ve:
                 logging.warning(f"Column error in '{var_name}': {ve}")
             except Exception as e:
@@ -184,9 +187,9 @@ def group_filter_data():
         .apply(list)
         .to_dict()
     )
-    logging.info(f"Processed DataFrame (first 5 rows):\n{unique_sheet_column_combination.head()}")
-
-    logging.info("\nStep 2: Grouping by 'table_name'.")
+    #logging.info(f"Processed DataFrame (first 5 rows):\n{unique_sheet_column_combination.head()}")
+ 
+    #logging.info("\nStep 2: Grouping by 'table_name'.")
     for table, columns in grouped_data.items():
         logging.info(f"Table: {table} | Mapped Columns: {columns}")
 
@@ -195,9 +198,9 @@ def group_filter_data():
 def filter_dataframes_by_grouped_data(dataframes, grouped_data):
     for table_name, columns in grouped_data.items():
         # Ensure the dataframe for this table exists
-        logging.warning(f"Table Name: {table_name}")
+        #logging.warning(f"Table Name: {table_name}")
         if table_name not in dataframes:
-            logging.warning(f"Table {table_name} not found in dataframes.")
+            #logging.warning(f"Table {table_name} not found in dataframes.")
             continue
         df = dataframes[table_name]
         # Prepare a list to hold all relevant columns (transformed and standalone)
@@ -207,13 +210,13 @@ def filter_dataframes_by_grouped_data(dataframes, grouped_data):
             # Check if the transformed column already exists in relevant_columns
             if transformed_column in df.columns and transformed_column not in relevant_columns:
                 relevant_columns.append(transformed_column)
-                logging.warning(f"Adding Transformed_column : {transformed_column}")
+                #logging.warning(f"Adding Transformed_column : {transformed_column}")
             elif column in df.columns and column not in relevant_columns:
                 # Add the standalone column if it exists
                 relevant_columns.append(column)
-                logging.warning(f"Original column is added {column}")
-            else:
-                logging.warning(f"{transformed_column} or {column} not found.")
+                #logging.warning(f"Original column is added {column}")
+            # else:
+            #     logging.warning(f"{transformed_column} or {column} not found.")
         # Remove duplicates (if any) to ensure no redundancy
         relevant_columns = list(set(relevant_columns))
         # Filter the dataframe to only include the relevant columns
@@ -766,7 +769,6 @@ for idx, scenario in grouped_scenarios.iterrows():
         bucketing_applicability = rule_group_to_bucketing_applicability.get(rule_group, 'Yes')
         if bucketing_flag_global == "No":
             bucketing_applicability = "No"
-
       
         conditions = rule_def_scenario[rule_def_scenario['condition_rule_set'] == rule_set]
         if len(conditions) < 1:
@@ -790,10 +792,10 @@ for idx, scenario in grouped_scenarios.iterrows():
         for i in range(len(conditions)):
             logging.warning("   ")
             condition = conditions.iloc[i]
-            # logging.warning(f"Applying condition: {condition}")
+            logging.warning(f"Applying condition: {condition}")
             column_name = condition['condition_column_name']
             if column_name not in df.columns:
-                logging.warning(f"Missing column: {column_name}")
+                logging.warning(f"Missing column: {column_name}  in {sheet_name}")
                 logging.warning("Returning default value 0.")
                 return {}, 0
     
@@ -839,7 +841,7 @@ for idx, scenario in grouped_scenarios.iterrows():
             
             # Check if weight_source_table is in all_dataframes_dict
             if weight_source_table not in all_dataframes_dict:
-                logging.warning(f"Missing weight source table: {weight_source_table}")
+                logging.warning(f"710 Missing weight source table: {weight_source_table}")
                 return {}, 0
             
             weight_df = all_dataframes_dict[weight_source_table]
