@@ -700,10 +700,6 @@ for idx, scenario in grouped_scenarios.iterrows():
     drill_down_data = []    
     bucketed_values_dict = {}  # Stores bucketed values for each label_id
 
-
-
-
-
     # Create mapping from rule_group to bucketing_applicability
     logging.warning("Creating mapping from rule_group to bucketing_applicability...")
     rule_group_to_bucketing_applicability = {}
