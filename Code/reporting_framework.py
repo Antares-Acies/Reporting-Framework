@@ -444,7 +444,7 @@ def evaluate_condition(df, condition):
         if condition_datatype == 'Integer':
             df[condition_column_name] = df[condition_column_name].astype(str)
             df[condition_column_name] = df[condition_column_name].str.lower()
-            df[condition_column_name] = df[condition_column_name].replace({'false': 0, 'true': 1})
+            df[condition_column_name] = df[condition_column_name].replace({'false': 0, 'true': 1, 'nan': 0, 'np.nan':0, np.nan:0})
             df[condition_column_name] = df[condition_column_name].astype(int)
             logging.warning(f" inside integer conversion for column ")
             df[condition_column_name] = df[condition_column_name].astype(int)
@@ -458,6 +458,7 @@ def evaluate_condition(df, condition):
             df_column = pd.to_datetime(df[condition_column_name])
         elif condition_datatype == 'Boolean':
             df_column = df[condition_column_name].astype(bool)
+            df_column = df[condition_column_name].apply(lambda x: True if str(x).lower() in ["yes", "true", "1"] else False)
         else:
             logging.warning(f"Unknown condition_datatype: {condition_datatype}")
             return pd.Series([True] * len(df), index=df.index)
@@ -698,6 +699,10 @@ for idx, scenario in grouped_scenarios.iterrows():
     # Re-initialize drill_down_data and bucketed_values_dict
     drill_down_data = []    
     bucketed_values_dict = {}  # Stores bucketed values for each label_id
+
+
+
+
 
     # Create mapping from rule_group to bucketing_applicability
     logging.warning("Creating mapping from rule_group to bucketing_applicability...")
